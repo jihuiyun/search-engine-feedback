@@ -1,0 +1,73 @@
+# 搜索引擎配置
+engines:
+  baidu:
+    url: https://www.baidu.com/
+    feedback_url: ""
+  bing:
+    url: https://cn.bing.com/
+    feedback_url: https://www.bing.com/webmasters/tools/contentremoval
+  toutiao:
+    url: "https://so.toutiao.com/search?dvpf=pc&source=input&keyword={keyword}"
+    feedback_url: ""
+  qihoo:
+    url: https://www.so.com/
+    feedback_url: https://info.so.com/cache_remove.html
+
+# 搜索关键词
+keywords:
+  - "91y金币回收银商上下分微信"
+  - "91y游戏金币找谁交易"
+  - "91y游戏金币找谁交易"
+  - "91y游戏金币找谁交易"
+  - "91y游戏捕鱼金币回收客服"
+  - "91y游戏金币在线回收"
+  - "91y游戏金币在线回收"
+  - "91y游戏收分和卖分"
+  - "91y游戏商人赚钱吗"
+  - "91y游戏能不能赚钱"
+  - "91y游戏赢钱了去哪下分"
+  - "91y游戏里全网最靠谱的商人"
+  - "91y游戏里全网最靠谱的商人"
+  - "91y游戏金币退分收分下分"
+  - "91y游戏金币退分收分下分"
+  - "91y如何快速下分给银商"
+  - "91y如何快速下分给银商"
+  - "91y如何转分给另一个人"
+  - "91y如何转分给另一个人"
+  - "91y捕鱼打上一个亿怎么下分"
+  - "91y捕鱼打上一个亿怎么下分"
+  - "91y捕鱼游戏分怎么卖"
+  - "91y捕鱼游戏分怎么卖"
+  - "91y捕鱼游戏分怎么卖"
+  - "91y24小时微信上下分银商"
+  - "91y24小时微信上下分银商"
+  - "91y如何转分"
+
+# 过期页面判断条件
+expired_conditions:
+  texts:
+    - "页面找不到"
+    - "您访问的页面不见了"
+    - "内容走丢了"
+    - "找不到问题了"
+    - "该问题可能已经失效"
+    - "后为您自动跳转至首页"
+    - "取消跳转"
+    - "秒以后自动返回"
+    - "404"
+    - "Not Found"
+    - "nginx"
+    - "视频已下线"
+    - "请观看其他精彩内容"
+    - "很抱歉"
+    - "该贴已被删除"
+  redirect_timeout: 5
+
+# 反馈信息
+feedback:
+  email: "huiyun@fuyuncn.com"
+  description: "网页打不开，提示内容已删除或找不到该网页，请删除快照，且快照包含91y关键词信息为不实内容，误导91y游戏用户，已严重影响到浮云公司的商誉和正常的经营秩序"
+
+# 数据库配置
+database:
+  path: "search_results.db" 
