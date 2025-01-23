@@ -64,7 +64,7 @@ expired_conditions:
     - "很抱歉，该贴已被删除"
     - "扫码登录请使用 百度贴吧App 扫码登录"
     - "Forbidden You don't have permission to access /index.php on this server."
-  redirect_timeout: 5
+  redirect_timeout: 3
 
 # 反馈信息
 feedback:
