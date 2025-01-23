@@ -9,8 +9,5 @@
             "console": "integratedTerminal",
             "justMyCode": true
         }
-    ],
-    "sqlite": {
-        "sqlite3": "${workspaceFolder}/search_results.db"
-    }
+    ]
 } 

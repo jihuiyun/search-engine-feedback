@@ -61,6 +61,9 @@ expired_conditions:
     - "请观看其他精彩内容"
     - "很抱歉"
     - "该贴已被删除"
+    - "很抱歉，该贴已被删除"
+    - "扫码登录请使用 百度贴吧App 扫码登录"
+    - "Forbidden You don't have permission to access /index.php on this server."
   redirect_timeout: 5
 
 # 反馈信息
@@ -70,4 +73,4 @@ feedback:
 
 # 数据库配置
 database:
-  path: "search_results.db" 
+  path: "search_results.sqlite3" 
