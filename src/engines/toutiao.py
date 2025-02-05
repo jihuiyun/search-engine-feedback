@@ -399,3 +399,26 @@ class ToutiaoEngine(SearchEngine):
                 except:
                     pass
                 return  # 出错时停止处理后续结果 
+
+    def wait_for_feedback_completion(self):
+        """等待反馈提交完成"""
+        try:
+            # 等待反馈成功提示元素出现
+            success_element = WebDriverWait(
+                self.driver,
+                self.config['timeouts']['feedback_wait']
+            ).until(
+                EC.presence_of_element_located((
+                    By.XPATH,
+                    self.config['selectors']['toutiao']['feedback_success']
+                ))
+            )
+            # 等待反馈成功提示消失
+            WebDriverWait(
+                self.driver,
+                self.config['timeouts']['feedback_wait']
+            ).until(
+                EC.invisibility_of_element(success_element)
+            )
+        except TimeoutException:
+            logger.warning("等待头条反馈完成超时") 

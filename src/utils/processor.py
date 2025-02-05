@@ -56,7 +56,9 @@ class SearchProcessor:
                         if is_expired:
                             logger.info(f"发现过期链接，准备提交反馈: {result['url']}")
                             engine.submit_feedback(result)
-                            time.sleep(1)
+                            # 等待反馈提交完成
+                            engine.wait_for_feedback_completion()
+                            logger.info(f"反馈提交完成: {result['url']}")
                             
                     except Exception as e:
                         logger.error(f"处理搜索结果时出错: {str(e)}")

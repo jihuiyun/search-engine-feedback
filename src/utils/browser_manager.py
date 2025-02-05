@@ -9,6 +9,10 @@ logger = logging.getLogger(__name__)
 
 class BrowserManager:
     def __init__(self):
+        """初始化浏览器管理器"""
+        # 禁用统计数据收集
+        os.environ['WDM_DISABLE_USAGE_STATS'] = 'true'
+        
         self.driver = None
         self.cookies_dir = "cookies"  # cookie 保存目录
         self.error_logs_dir = "error_logs"  # 添加错误日志目录

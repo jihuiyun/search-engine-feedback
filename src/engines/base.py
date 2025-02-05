@@ -62,3 +62,7 @@ class SearchEngine(ABC):
             self.wait = self.browser_manager.wait
             return False
         return True 
+
+    def wait_for_feedback_completion(self):
+        """等待反馈提交完成"""
+        raise NotImplementedError("子类必须实现 wait_for_feedback_completion 方法") 

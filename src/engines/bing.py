@@ -7,6 +7,7 @@ from .base import SearchEngine
 import time
 import logging
 import os
+from selenium.webdriver.support.ui import WebDriverWait
 
 logger = logging.getLogger(__name__)
 
@@ -79,31 +80,58 @@ class BingEngine(SearchEngine):
         current_window = self.driver.current_window_handle
         
         try:
+            # 设置页面加载超时为10秒
+            self.driver.set_page_load_timeout(5)  # 改为5秒超时
+            
             # 新标签页打开链接
             self.driver.execute_script(f"window.open('{url}', '_blank');")
             self.driver.switch_to.window(self.driver.window_handles[-1])
             
-            # 等待页面加载
-            time.sleep(2)
-            
-            # 检查是否重定向到首页
-            if self.wait_for_redirect(self.config['expired_conditions']['redirect_timeout']):
-                return True
+            try:
+                # 等待页面加载
+                time.sleep(2)
                 
-            # 检查页面内容是否包含过期标志
-            page_content = self.driver.page_source
-            is_expired = self.is_page_expired(page_content)
-            
-            return is_expired
-            
+                # 先检查页面内容是否包含过期标志
+                page_content = self.driver.page_source
+                if self.is_page_expired(page_content):
+                    logger.info("检测到页面包含过期标志")
+                    return True
+                
+                # 如果页面内容没有过期标志，则等待看是否会重定向
+                logger.info("页面内容正常，等待检查是否重定向...")
+                if self.wait_for_redirect(self.config['expired_conditions']['redirect_timeout']):
+                    logger.info("检测到页面发生重定向")
+                    return True
+                
+                logger.info("页面正常访问")
+                return False
+                
+            except TimeoutException:
+                logger.info(f"页面加载超时: {url}，视为正常页面")
+                return False  # 改为将超时视为页面正常
+                
         finally:
+            # 恢复默认超时设置
+            self.driver.set_page_load_timeout(300)  # 恢复默认的300秒
             # 关闭当前标签页,切回原标签页
-            self.driver.close()
-            self.driver.switch_to.window(current_window)
+            try:
+                self.driver.close()
+                self.driver.switch_to.window(current_window)
+            except Exception as e:
+                logger.error(f"关闭标签页失败: {str(e)}")
+                # 如果关闭失败，尝试重新初始化浏览器
+                self.ensure_browser()
 
-    def submit_feedback(self, result: Dict[str, Any]) -> None:
+    def submit_feedback(self, result: Dict[str, Any]) -> bool:
         """提交反馈"""
+        # 保存当前窗口句柄
+        current_window = self.driver.current_window_handle
+        
         try:
+            # 新开标签页
+            self.driver.execute_script("window.open('');")
+            self.driver.switch_to.window(self.driver.window_handles[-1])
+            
             # 打开反馈页面
             feedback_url = self.engine_config['feedback_url']
             self.driver.get(feedback_url)
@@ -166,7 +194,7 @@ class BingEngine(SearchEngine):
             
         except Exception as e:
             logger.error(f"提交反馈失败: {str(e)}")
-            # 保存错误截图和页面源码到错误日志目录
+            # 保存错误截图和页面源码
             try:
                 timestamp = int(time.time())
                 error_prefix = f"bing_feedback_error_{timestamp}"
@@ -189,21 +217,79 @@ class BingEngine(SearchEngine):
                 logger.error(f"页面源码已保存到: {html_path}")
             except:
                 pass
+            return False
+        
+        finally:
+            # 关闭反馈标签页，切回搜索结果页
+            try:
+                self.driver.close()
+                self.driver.switch_to.window(current_window)
+            except Exception as e:
+                logger.error(f"切回原窗口失败: {str(e)}")
+                # 如果切回失败，尝试重新初始化浏览器
+                self.ensure_browser()
+        
+        return True
 
     def next_page(self) -> bool:
         """跳转到下一页"""
         try:
-            # 查找下一页按钮
-            next_link = self.driver.find_element(By.CLASS_NAME, "sb_pagN")
+            # 使用更精确的选择器查找下一页按钮
+            next_link = self.wait.until(
+                EC.presence_of_element_located((
+                    By.CSS_SELECTOR, 
+                    "a.sb_pagN[title='下一页']"
+                ))
+            )
             
-            if not next_link:
+            if not next_link or 'disabled' in next_link.get_attribute('class'):
                 return False
             
-            # 点击下一页
-            next_link.click()
-            time.sleep(2)
+            # 获取下一页的URL
+            next_url = next_link.get_attribute('href')
+            if not next_url:
+                return False
+            
+            # 直接使用URL导航而不是点击按钮
+            self.driver.get(next_url)
+            time.sleep(2)  # 等待页面加载
+            
+            # 验证是否成功翻页
+            try:
+                # 检查URL是否包含 first 参数
+                current_url = self.driver.current_url
+                if 'first=' not in current_url:
+                    logger.warning("翻页可能未成功：URL中未找到页码参数")
+                    return False
+            except Exception as e:
+                logger.error(f"验证翻页时出错: {str(e)}")
+                return False
             
             return True
             
-        except NoSuchElementException:
-            return False 
+        except Exception as e:
+            logger.error(f"翻页时出错: {str(e)}")
+            return False
+
+    def wait_for_feedback_completion(self):
+        """等待反馈提交完成"""
+        try:
+            # 等待反馈成功提示元素出现
+            success_element = WebDriverWait(
+                self.driver, 
+                self.config['timeouts']['feedback_wait']
+            ).until(
+                EC.presence_of_element_located((
+                    By.XPATH, 
+                    self.config['selectors']['bing']['feedback_success']
+                ))
+            )
+            # 等待反馈成功提示消失
+            WebDriverWait(
+                self.driver,
+                self.config['timeouts']['feedback_wait']
+            ).until(
+                EC.invisibility_of_element(success_element)
+            )
+        except TimeoutException:
+            logger.warning("等待必应反馈完成超时") 

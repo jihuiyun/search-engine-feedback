@@ -1,4 +1,5 @@
 import logging
+import os
 from src.utils.browser_manager import BrowserManager
 from src.utils.processor import SearchProcessor
 from src.engines.toutiao import ToutiaoEngine
@@ -11,8 +12,11 @@ logging.basicConfig(
 )
 
 def main():
+    # 禁用 webdriver-manager 的统计数据收集
+    os.environ['WDM_DISABLE_USAGE_STATS'] = 'true'
+    
     browser_manager = BrowserManager()
-    config_path = "config/config.yaml"
+    config_path = "config.yaml"
     
     try:
         # 初始化搜索引擎
