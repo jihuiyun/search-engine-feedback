@@ -112,8 +112,9 @@ class SearchProcessor:
     def run(self):
         """运行主程序"""
         try:
-            for keyword in self.config['keywords']:
-                for engine_name in self.engines:
+            for engine_name in self.engines:
+                logger.info(f"开始处理 {engine_name} 引擎的搜索任务")
+                for keyword in self.config['keywords']:
                     # 检查关键词是否已完成
                     is_done = self.db.check_keyword_done(keyword, engine_name)
                     if is_done:
@@ -121,5 +122,6 @@ class SearchProcessor:
                         continue
                         
                     self.process_keyword(engine_name, keyword)
+                logger.info(f"完成 {engine_name} 引擎的所有关键词处理")
         finally:
             self.browser_manager.quit() 
