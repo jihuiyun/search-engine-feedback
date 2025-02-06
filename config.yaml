@@ -6,6 +6,7 @@ engines:
   bing:
     url: https://cn.bing.com/
     feedback_url: https://www.bing.com/webmasters/tools/contentremoval
+    cookie_file: bing.com.txt
   toutiao:
     url: "https://so.toutiao.com/search?dvpf=pc&source=input&keyword={keyword}"
     feedback_url: ""

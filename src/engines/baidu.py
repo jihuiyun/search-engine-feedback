@@ -54,7 +54,7 @@ class BaiduEngine(SearchEngine):
                 return None
             
             # 尝试加载 cookie
-            self._load_cookies()
+            self.browser_manager.load_cookies('baidu.com')
             
             if self.engine_config.get('reload_after_cookie', True):
                 # 刷新页面使 cookie 生效
@@ -69,31 +69,6 @@ class BaiduEngine(SearchEngine):
         except Exception as e:
             logger.error(f"搜索出错: {str(e)}")
             return None
-
-    def _load_cookies(self) -> None:
-        """加载百度的 cookie"""
-        cookie_file = os.path.join(
-            os.path.dirname(os.path.dirname(self.config_path)),  # 上级目录
-            'cookies',  # cookies 目录
-            self.engine_config.get('cookie_file', 'baidu.com.txt')
-        )
-        
-        if os.path.exists(cookie_file):
-            try:
-                with open(cookie_file, 'r', encoding='utf-8') as f:
-                    cookie_text = f.read().strip()
-                    if cookie_text:
-                        cookie_list = [item.strip() for item in cookie_text.split(';') if item.strip()]
-                        for cookie_item in cookie_list:
-                            name, value = cookie_item.split('=', 1)
-                            self.driver.add_cookie({
-                                'name': name.strip(),
-                                'value': value.strip(),
-                                'domain': '.baidu.com'
-                            })
-                logger.info("成功加载百度 cookie")
-            except Exception as e:
-                logger.warning(f"加载百度 cookie 失败: {str(e)}")
 
     def _wait_for_login(self) -> bool:
         """等待用户登录完成"""

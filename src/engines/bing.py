@@ -8,6 +8,7 @@ import time
 import logging
 import os
 from selenium.webdriver.support.ui import WebDriverWait
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -17,98 +18,156 @@ class BingEngine(SearchEngine):
         self.engine_config = self.config['engines']['bing']
         self.feedback_config = self.config['feedback']
 
-    def search(self, keyword: str) -> None:
-        """执行必应搜索"""
+    def search(self, keyword: str, target_page: int = None) -> None:
+        """执行必应搜索，支持直接跳转到指定页码"""
         try:
             if not self.ensure_browser():
-                logger.warning("浏览器已重新初始化")
+                logger.warning("浏览器状态: 已重新初始化")
             
-            # 打开必应搜索页面
-            self.driver.get(self.engine_config['url'])
-            time.sleep(2)
+            logger.info(f"执行搜索: '{keyword}'")
             
-            # 查找搜索框并输入关键词
-            search_input = self.wait.until(
-                EC.presence_of_element_located((By.ID, "sb_form_q"))
-            )
-            search_input.clear()
-            search_input.send_keys(keyword)
-            search_input.send_keys(Keys.RETURN)
+            if target_page and target_page > 1:
+                # 直接构造目标页的URL
+                first_param = (target_page - 1) * 10
+                search_url = f"{self.engine_config['url']}search?q={keyword}&first={first_param}"
+                logger.info(f"直接跳转到第 {target_page} 页")
+            else:
+                search_url = self.engine_config['url']
+            
+            self.driver.get(search_url)
             time.sleep(2)
+
+            if not target_page:
+                # 如果不是直接跳转，需要执行搜索
+                search_input = self.wait.until(
+                    EC.presence_of_element_located((By.ID, "sb_form_q"))
+                )
+                search_input.clear()
+                search_input.send_keys(keyword)
+                search_input.send_keys(Keys.RETURN)
+                logger.debug("搜索请求: 已提交")
+                time.sleep(2)
             
         except Exception as e:
-            logger.error(f"搜索出错: {str(e)}")
-            return None
+            logger.error(f"搜索错误: {str(e)}")
 
-    def get_search_results(self) -> List[Dict[str, Any]]:
-        """获取搜索结果列表"""
+    def get_page_info(self) -> Dict[str, int]:
+        """获取当前页码信息"""
+        try:
+            page_info = {'current': 1, 'max': 1}
+            
+            # 获取所有页码按钮（排除下一页按钮）
+            page_links = self.driver.find_elements(By.CSS_SELECTOR, "li a[aria-label^='第']")
+            if page_links:
+                # 获取当前页码
+                current_page_elem = self.driver.find_element(By.CSS_SELECTOR, "li a.sb_pagS")
+                page_info['current'] = int(current_page_elem.text)
+                
+                # 获取最大页码
+                page_info['max'] = max(int(link.text) for link in page_links)
+                
+            return page_info
+        except Exception as e:
+            logger.error(f"获取页码信息失败: {str(e)}")
+            return {'current': 1, 'max': 1}
+
+    def get_search_results(self, target_page: int = None) -> List[Dict[str, Any]]:
+        """获取搜索结果列表，支持处理目标页码"""
         results = []
         try:
+            if not self.ensure_browser():
+                logger.error("浏览器状态: 连接已断开，尝试重新初始化")
+                return results
+            
             # 等待搜索结果加载
-            self.wait.until(
-                EC.presence_of_element_located((By.ID, "b_results"))
-            )
+            try:
+                self.wait.until(EC.presence_of_element_located((By.ID, "b_results")))
+            except TimeoutException:
+                logger.error("搜索结果: 加载超时")
+                return results
             
-            # 获取所有搜索结果
-            result_items = self.driver.find_elements(By.CLASS_NAME, "b_algo")
+            # 检查是否有搜索结果
+            try:
+                # 检查是否显示"没有找到结果"
+                no_results = self.driver.find_elements(By.CLASS_NAME, "b_no")
+                if no_results:
+                    logger.info("搜索结果: 没有找到相关结果")
+                    return results
+                
+                # 获取页码信息
+                page_info = self.get_page_info()
+                logger.debug(f"页码信息: 当前第 {page_info['current']} 页，最大 {page_info['max']} 页")
+                
+                if target_page:
+                    if target_page > page_info['max']:
+                        logger.warning(f"目标页码 {target_page} 超过最大页数 {page_info['max']}")
+                        return results
+                    elif target_page != page_info['current']:
+                        logger.info(f"当前在第 {page_info['current']} 页，需要跳转到第 {target_page} 页")
+                        self.search(self.current_keyword, target_page)
+                        return self.get_search_results()  # 递归获取目标页结果
+                
+                # 获取搜索结果
+                result_items = self.driver.find_elements(By.CLASS_NAME, "b_algo")
+                if not result_items:
+                    logger.warning("搜索结果: 未找到任何结果")
+                    return results
+                
+                logger.info(f"搜索结果: 找到 {len(result_items)} 条记录")
+                
+                for item in result_items:
+                    try:
+                        title_element = item.find_element(By.TAG_NAME, "h2").find_element(By.TAG_NAME, "a")
+                        result = {
+                            'title': title_element.text.strip(),
+                            'url': title_element.get_attribute('href'),
+                            'element': item
+                        }
+                        results.append(result)
+                    except NoSuchElementException:
+                        continue
+                    
+            except Exception as e:
+                logger.error(f"搜索结果处理错误: {str(e)}")
             
-            for item in result_items:
-                try:
-                    # 获取标题和链接
-                    title_element = item.find_element(By.TAG_NAME, "h2").find_element(By.TAG_NAME, "a")
-                    
-                    result = {
-                        'title': title_element.text.strip(),
-                        'url': title_element.get_attribute('href'),
-                        'element': item
-                    }
-                    results.append(result)
-                    
-                except NoSuchElementException:
-                    continue
-                    
         except Exception as e:
-            logger.error(f"获取搜索结果出错: {str(e)}")
-            
+            logger.error(f"获取搜索结果失败: {str(e)}")
+            if "Connection refused" in str(e):
+                logger.warning("浏览器连接断开，尝试重新初始化...")
+                self.ensure_browser()
+        
         return results
 
     def check_expired(self, url: str) -> bool:
         """检查链接是否过期"""
-        if not self.ensure_browser():
-            return False
-            
-        current_window = self.driver.current_window_handle
-        
+        logger.debug(f"开始检查: {url}")
         try:
-            # 设置页面加载超时为10秒
-            self.driver.set_page_load_timeout(5)  # 改为5秒超时
+            # 设置超时
+            self.driver.set_page_load_timeout(5)
+            logger.debug("页面加载: 设置5秒超时")
             
-            # 新标签页打开链接
+            # 新标签页打开
             self.driver.execute_script(f"window.open('{url}', '_blank');")
             self.driver.switch_to.window(self.driver.window_handles[-1])
             
             try:
-                # 等待页面加载
                 time.sleep(2)
-                
-                # 先检查页面内容是否包含过期标志
                 page_content = self.driver.page_source
                 if self.is_page_expired(page_content):
-                    logger.info("检测到页面包含过期标志")
+                    logger.info("检查结果: 页面包含过期标志")
                     return True
                 
-                # 如果页面内容没有过期标志，则等待看是否会重定向
-                logger.info("页面内容正常，等待检查是否重定向...")
+                logger.debug("检查重定向: 等待页面状态...")
                 if self.wait_for_redirect(self.config['expired_conditions']['redirect_timeout']):
-                    logger.info("检测到页面发生重定向")
+                    logger.info("检查结果: 检测到页面重定向")
                     return True
                 
-                logger.info("页面正常访问")
+                logger.info("检查结果: 页面正常访问")
                 return False
                 
             except TimeoutException:
-                logger.info(f"页面加载超时: {url}，视为正常页面")
-                return False  # 改为将超时视为页面正常
+                logger.info("检查结果: 页面加载超时，视为正常")
+                return False
                 
         finally:
             # 恢复默认超时设置
@@ -116,7 +175,7 @@ class BingEngine(SearchEngine):
             # 关闭当前标签页,切回原标签页
             try:
                 self.driver.close()
-                self.driver.switch_to.window(current_window)
+                self.driver.switch_to.window(self.driver.window_handles[0])
             except Exception as e:
                 logger.error(f"关闭标签页失败: {str(e)}")
                 # 如果关闭失败，尝试重新初始化浏览器
@@ -137,12 +196,6 @@ class BingEngine(SearchEngine):
             self.driver.get(feedback_url)
             time.sleep(2)
             
-            # 尝试加载已保存的 cookies
-            if self.browser_manager.load_cookies('bing.com'):
-                # 重新加载页面以应用 cookies
-                self.driver.get(feedback_url)
-                time.sleep(2)
-            
             # 检查是否需要登录 - 支持多个登录页面
             login_urls = [
                 "https://www.bing.com/toolbox/intermediatelogin/",
@@ -153,14 +206,29 @@ class BingEngine(SearchEngine):
             # 检查当前URL是否是登录页面
             is_login_page = any(self.driver.current_url.startswith(url) for url in login_urls)
             if is_login_page:
-                logger.info("检测到需要登录，等待手动登录...")
-                # 等待用户手动登录完成，通过检查URL变化来判断
-                while any(self.driver.current_url.startswith(url) for url in login_urls):
-                    time.sleep(1)
-                logger.info("登录完成，继续提交反馈")
-                # 保存登录后的 cookies
-                self.browser_manager.save_cookies('bing.com')
-                time.sleep(2)
+                # 先尝试加载本地 cookie
+                if self.browser_manager.load_cookies('bing.com'):
+                    logger.info("已加载本地 cookie，刷新页面...")
+                    self.driver.get(feedback_url)
+                    time.sleep(2)
+                    
+                    # 再次检查是否还需要登录
+                    is_login_page = any(self.driver.current_url.startswith(url) for url in login_urls)
+                    if not is_login_page:
+                        logger.info("使用本地 cookie 登录成功")
+                    else:
+                        logger.info("本地 cookie 已失效，需要手动登录...")
+                
+                # 如果仍然需要登录，等待用户手动登录
+                if is_login_page:
+                    logger.info("检测到需要登录，等待手动登录...")
+                    # 等待用户手动登录完成，通过检查URL变化来判断
+                    while any(self.driver.current_url.startswith(url) for url in login_urls):
+                        time.sleep(1)
+                    logger.info("登录完成，继续提交反馈")
+                    # 保存新的登录 cookies
+                    self.browser_manager.save_cookies('bing.com')
+                    time.sleep(2)
             
             # 确保在反馈页面
             if not self.driver.current_url.startswith(feedback_url):
@@ -234,7 +302,22 @@ class BingEngine(SearchEngine):
     def next_page(self) -> bool:
         """跳转到下一页"""
         try:
-            # 使用更精确的选择器查找下一页按钮
+            # 获取所有页码，检查最大页数
+            page_links = self.driver.find_elements(By.CSS_SELECTOR, "li a.b_widePag")
+            if page_links:
+                page_numbers = [int(link.text) for link in page_links if link.text.isdigit()]
+                if page_numbers:
+                    max_page = max(page_numbers)
+                    current_url = self.driver.current_url
+                    current_page_match = re.search(r'first=(\d+)', current_url)
+                    current_page = 1
+                    if current_page_match:
+                        current_page = (int(current_page_match.group(1)) // 10) + 1
+                    if current_page >= max_page:
+                        logger.info(f"已到达最后一页: {max_page}")
+                        return False
+            
+            # 查找下一页按钮
             next_link = self.wait.until(
                 EC.presence_of_element_located((
                     By.CSS_SELECTOR, 
@@ -250,20 +333,9 @@ class BingEngine(SearchEngine):
             if not next_url:
                 return False
             
-            # 直接使用URL导航而不是点击按钮
+            # 直接使用URL导航
             self.driver.get(next_url)
-            time.sleep(2)  # 等待页面加载
-            
-            # 验证是否成功翻页
-            try:
-                # 检查URL是否包含 first 参数
-                current_url = self.driver.current_url
-                if 'first=' not in current_url:
-                    logger.warning("翻页可能未成功：URL中未找到页码参数")
-                    return False
-            except Exception as e:
-                logger.error(f"验证翻页时出错: {str(e)}")
-                return False
+            time.sleep(2)
             
             return True
             
