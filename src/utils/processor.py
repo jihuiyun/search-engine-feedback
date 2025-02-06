@@ -114,6 +114,12 @@ class SearchProcessor:
         try:
             for keyword in self.config['keywords']:
                 for engine_name in self.engines:
+                    # 检查关键词是否已完成
+                    is_done = self.db.check_keyword_done(keyword, engine_name)
+                    if is_done:
+                        logger.info(f"跳过已完成关键词: {engine_name} 搜索 '{keyword}'")
+                        continue
+                        
                     self.process_keyword(engine_name, keyword)
         finally:
-            self.browser_manager.quit()  # 使用 browser_manager 来关闭浏览器 
+            self.browser_manager.quit() 

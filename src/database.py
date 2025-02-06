@@ -164,4 +164,20 @@ class Database:
                 return None
         except Exception as e:
             logger.error(f"数据库错误: 获取 URL 记录失败 - {str(e)}")
-            return None 
+            return None
+
+    def check_keyword_done(self, keyword: str, search_engine: str) -> bool:
+        """检查关键词是否已处理完成"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT is_done 
+                    FROM progress 
+                    WHERE keyword = ? AND search_engine = ?
+                ''', (keyword, search_engine))
+                result = cursor.fetchone()
+                return bool(result[0]) if result else False
+        except Exception as e:
+            logger.error(f"数据库错误: 检查关键词完成状态失败 - {str(e)}")
+            return False 
