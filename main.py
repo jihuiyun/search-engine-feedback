@@ -5,9 +5,10 @@ from src.utils.processor import SearchProcessor
 from src.engines.toutiao import ToutiaoEngine
 from src.engines.bing import BingEngine
 from src.engines.baidu import BaiduEngine
-from src.engines.so import SoEngine
+from src.engines.so360 import So360Engine
 import urllib3
 from selenium.webdriver.remote.remote_connection import LOGGER as selenium_logger
+import platform
 
 # 配置日志
 logging.basicConfig(
@@ -26,8 +27,13 @@ logger = logging.getLogger(__name__)
 
 def main():
     logger.info("程序启动: 初始化系统配置...")
-    # 禁用 webdriver-manager 的统计数据收集
+    # 设置环境变量
     os.environ['WDM_DISABLE_USAGE_STATS'] = 'true'
+    os.environ['WDM_SSL_VERIFY'] = '0'
+    os.environ['WDM_PRINT_FIRST_LINE'] = 'False'
+    os.environ['WDM_LOCAL_PATH'] = './drivers'
+    os.environ['WDM_ARCHITECTURE'] = 'arm64' if platform.processor().startswith('arm') else 'x64'
+    os.environ['WDM_LOG_LEVEL'] = '0'  # 减少日志输出
     
     browser_manager = BrowserManager()
     config_path = "config.yaml"
@@ -36,8 +42,9 @@ def main():
         # 初始化搜索引擎
         logger.info("初始化搜索引擎...")
         engines = {
+            'baidu': BaiduEngine(config_path, browser_manager),
             'bing': BingEngine(config_path, browser_manager),
-            'so': SoEngine(config_path, browser_manager),
+            'so': So360Engine(config_path, browser_manager),
         }
         
         # 创建处理器并运行

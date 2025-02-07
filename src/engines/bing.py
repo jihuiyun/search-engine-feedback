@@ -364,4 +364,32 @@ class BingEngine(SearchEngine):
                 EC.invisibility_of_element(success_element)
             )
         except TimeoutException:
-            logger.warning("等待必应反馈完成超时") 
+            logger.warning("等待必应反馈完成超时")
+
+    def get_current_page(self) -> int:
+        """获取必应搜索当前页码"""
+        try:
+            # 从URL中获取页码
+            current_url = self.driver.current_url
+            if 'first=' in current_url:
+                # Bing使用first参数表示结果起始位置，每页10条
+                first = int(re.search(r'first=(\d+)', current_url).group(1))
+                return (first // 10) + 1
+            return 1
+        except (AttributeError, ValueError):
+            return 1
+
+    def get_domain(self) -> str:
+        return "bing.com"
+
+    def check_login(self) -> bool:
+        try:
+            # 检查当前URL是否是登录页面
+            login_urls = [
+                "https://www.bing.com/toolbox/intermediatelogin/",
+                "https://login.microsoftonline.com/",
+                "https://login.live.com/"
+            ]
+            return not any(self.driver.current_url.startswith(url) for url in login_urls)
+        except Exception:
+            return False 

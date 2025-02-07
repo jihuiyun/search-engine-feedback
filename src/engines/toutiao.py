@@ -422,3 +422,31 @@ class ToutiaoEngine(SearchEngine):
             )
         except TimeoutException:
             logger.warning("等待头条反馈完成超时") 
+
+    def get_current_page(self) -> int:
+        """获取头条搜索当前页码"""
+        try:
+            # 查找当前页码元素
+            current = self.driver.find_element(
+                By.CSS_SELECTOR, 
+                "button.cs-pagination-item.active"
+            )
+            return int(current.text)
+        except (NoSuchElementException, ValueError):
+            return 1 
+
+    def get_domain(self) -> str:
+        return "toutiao.com"
+
+    def check_login(self) -> bool:
+        try:
+            # 检查是否有登录按钮
+            login_btn = self.driver.find_elements(By.CLASS_NAME, "login-button")
+            if login_btn and login_btn[0].is_displayed():
+                return False
+                
+            # 检查是否有用户头像
+            avatar = self.driver.find_elements(By.CLASS_NAME, "user-avatar")
+            return bool(avatar and avatar[0].is_displayed())
+        except Exception:
+            return False 

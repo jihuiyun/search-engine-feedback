@@ -1,10 +1,16 @@
 import logging
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.common.exceptions import WebDriverException
 import json
 import os
 import time
+from webdriver_manager.chrome import ChromeDriverManager
+import platform
+import shutil
+import urllib.request
+import zipfile
 
 logger = logging.getLogger(__name__)
 
@@ -25,36 +31,100 @@ class BrowserManager:
     def init_browser(self):
         """初始化浏览器"""
         logger.info("浏览器: 开始初始化...")
-        max_retries = 3
-        retry_count = 0
         
-        while retry_count < max_retries:
+        # 创建 Chrome 选项
+        options = webdriver.ChromeOptions()
+        options.add_argument('--disable-gpu')
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--disable-extensions')
+        
+        # 设置下载路径
+        os.makedirs(self.error_logs_dir, exist_ok=True)
+        
+        # 尝试在以下位置查找本地 ChromeDriver
+        driver_paths = [
+            './chromedriver',  # 项目根目录
+            './drivers/chromedriver',  # drivers 子目录
+            '/usr/local/bin/chromedriver',  # 系统路径
+        ]
+        
+        for driver_path in driver_paths:
             try:
-                if self.driver:
-                    try:
-                        self.driver.quit()
-                        logger.debug("浏览器: 关闭旧实例")
-                    except:
-                        pass
-                
-                options = webdriver.ChromeOptions()
-                options.add_argument('--disable-gpu')
-                options.add_argument('--no-sandbox')
-                options.add_argument('--disable-dev-shm-usage')
-                options.add_argument('--remote-debugging-port=0')  # 防止端口冲突
-                
-                self.driver = webdriver.Chrome(options=options)
-                self.driver.maximize_window()
-                self.wait = WebDriverWait(self.driver, 10)
-                logger.info("浏览器: 初始化完成")
-                return
-                
+                if os.path.exists(driver_path):
+                    logger.info(f"尝试使用本地 ChromeDriver: {driver_path}")
+                    service = Service(driver_path)
+                    self.driver = webdriver.Chrome(service=service, options=options)
+                    self.driver.set_page_load_timeout(300)
+                    self.wait = WebDriverWait(self.driver, 10)
+                    logger.info("浏览器: 使用本地 ChromeDriver 初始化成功")
+                    return
             except Exception as e:
-                retry_count += 1
-                logger.error(f"浏览器初始化失败 (尝试 {retry_count}/{max_retries}): {str(e)}")
-                time.sleep(2)
+                logger.warning(f"使用本地 ChromeDriver {driver_path} 失败: {str(e)}")
         
-        raise Exception("浏览器初始化失败: 已达到最大重试次数")
+        # 如果本地驱动都失败，则尝试自动下载
+        try:
+            logger.info("尝试自动下载 ChromeDriver...")
+            
+            # 清理可能损坏的缓存
+            cache_dir = os.path.expanduser('~/.wdm')
+            if os.path.exists(cache_dir):
+                logger.info("清理旧的驱动缓存...")
+                shutil.rmtree(cache_dir)
+            
+            # 创建下载目录
+            drivers_dir = './drivers'
+            os.makedirs(drivers_dir, exist_ok=True)
+            
+            # 获取 Chrome 版本
+            chrome_version = None
+            try:
+                chrome_process = os.popen('"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --version')
+                chrome_version = chrome_process.read().strip().split()[-1]  # 获取版本号
+                chrome_process.close()
+            except Exception as e:
+                logger.error(f"获取 Chrome 版本失败: {str(e)}")
+                raise
+            
+            logger.info(f"检测到 Chrome 版本: {chrome_version}")
+            
+            # 下载对应版本的 ChromeDriver
+            # 构造下载 URL (使用 Chrome for Testing)
+            download_url = f"https://storage.googleapis.com/chrome-for-testing-public/{chrome_version}/mac-arm64/chromedriver-mac-arm64.zip"
+            zip_path = os.path.join(drivers_dir, 'chromedriver.zip')
+            driver_path = os.path.join(drivers_dir, 'chromedriver')
+            
+            # 下载文件
+            logger.info(f"下载 ChromeDriver: {download_url}")
+            urllib.request.urlretrieve(download_url, zip_path)
+            
+            # 解压文件
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(drivers_dir)
+            
+            # 移动 chromedriver 到正确位置
+            extracted_driver = os.path.join(drivers_dir, 'chromedriver-mac-arm64', 'chromedriver')
+            if os.path.exists(driver_path):
+                os.remove(driver_path)
+            shutil.move(extracted_driver, driver_path)
+            
+            # 设置执行权限
+            os.chmod(driver_path, 0o755)
+            
+            # 清理临时文件
+            os.remove(zip_path)
+            shutil.rmtree(os.path.join(drivers_dir, 'chromedriver-mac-arm64'))
+            
+            # 使用下载的驱动
+            service = Service(driver_path)
+            self.driver = webdriver.Chrome(service=service, options=options)
+            self.driver.set_page_load_timeout(300)
+            self.wait = WebDriverWait(self.driver, 10)
+            logger.info("浏览器: 使用自动下载的 ChromeDriver 初始化成功")
+            
+        except Exception as e:
+            logger.error(f"浏览器初始化失败: {str(e)}")
+            raise
     
     def check_browser(self):
         """检查浏览器是否正常"""

@@ -3,6 +3,7 @@ engines:
   baidu:
     url: https://www.baidu.com/
     feedback_url: ""
+    cookie_file: baidu.com.txt
   bing:
     url: https://cn.bing.com/
     feedback_url: https://www.bing.com/webmasters/tools/contentremoval
@@ -10,9 +11,11 @@ engines:
   toutiao:
     url: "https://so.toutiao.com/search?dvpf=pc&source=input&keyword={keyword}"
     feedback_url: ""
-  so:
-    url: https://www.so.com/
+    cookie_file: toutiao.com.txt
+  so360:
+    url: "https://www.so.com"
     feedback_url: https://info.so.com/cache_remove.html
+    cookie_file: so.com.txt
 
 # 搜索关键词
 keywords:

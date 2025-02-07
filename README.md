@@ -95,3 +95,33 @@
 
 注意：由于不同搜索引擎的反馈方式不一样，且部分过程需要人工介入（登录等……），所以整体逻辑都是串行调用，不进行多线程处理。
 
+## ChromeDriver 配置
+
+本程序优先使用本地 ChromeDriver。您可以：
+
+1. 将 chromedriver 放在以下任一位置：
+   - 项目根目录 (`./chromedriver`)
+   - drivers 子目录 (`./drivers/chromedriver`)
+   - 系统路径 (`/usr/local/bin/chromedriver`)
+
+2. 确保 ChromeDriver 版本与您的 Chrome 浏览器版本匹配
+
+3. 如果您使用的是 M1/M2 Mac，请下载 mac-arm64 版本的 ChromeDriver
+
+如果找不到本地 ChromeDriver 或版本不匹配，程序会自动下载合适的版本。
+
+### 手动下载 ChromeDriver
+
+1. 查看 Chrome 版本：
+   - 打开 Chrome
+   - 点击右上角三个点
+   - 帮助 -> 关于 Google Chrome
+
+2. 下载对应版本的 ChromeDriver：
+   - 访问 https://chromedriver.chromium.org/downloads
+   - 选择与 Chrome 版本匹配的 ChromeDriver
+   - Mac M1/M2 用户选择 mac-arm64 版本
+   - 其他系统选择对应版本
+
+3. 解压并将 chromedriver 放在上述任一位置
+
