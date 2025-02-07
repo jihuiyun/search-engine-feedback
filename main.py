@@ -5,6 +5,7 @@ from src.utils.processor import SearchProcessor
 from src.engines.toutiao import ToutiaoEngine
 from src.engines.bing import BingEngine
 from src.engines.baidu import BaiduEngine
+from src.engines.so import SoEngine
 import urllib3
 from selenium.webdriver.remote.remote_connection import LOGGER as selenium_logger
 
@@ -35,9 +36,8 @@ def main():
         # 初始化搜索引擎
         logger.info("初始化搜索引擎...")
         engines = {
-            # 'baidu': BaiduEngine(config_path, browser_manager),
             'bing': BingEngine(config_path, browser_manager),
-            # 'toutiao': ToutiaoEngine(config_path, browser_manager),
+            'so': SoEngine(config_path, browser_manager),
         }
         
         # 创建处理器并运行

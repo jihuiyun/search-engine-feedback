@@ -10,7 +10,7 @@ engines:
   toutiao:
     url: "https://so.toutiao.com/search?dvpf=pc&source=input&keyword={keyword}"
     feedback_url: ""
-  qihoo:
+  so:
     url: https://www.so.com/
     feedback_url: https://info.so.com/cache_remove.html
 

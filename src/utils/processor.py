@@ -31,7 +31,7 @@ class SearchProcessor:
         try:
             engine.search(keyword)
             while True:
-                results = engine.get_search_results()
+                results = engine.get_search_results() 
                 
                 if not results:
                     logger.info(f"任务完成: {engine_name} 搜索 '{keyword}' 的当前页 {current_page} 超过最大页数")
