@@ -47,29 +47,28 @@ class SearchProcessor:
             
             # 检查是否已处理过
             existing_result = self.db.get_existing_result(result['url'])
-            if existing_result:
-                # 判断是否不是当前词条的记录
-                same = self.db.get_existing_result(result['url'], keyword, engine_name)
-                
+            same = self.db.get_existing_result(None, keyword, engine_name, result['title'])
+
+            if existing_result or same:
                 if not same:
                     result['is_expired'] = existing_result['is_expired']
                     self.db.save_result(result)
                     
-                logger.info(f"重复处理，跳过：【{engine_name} - {keyword}】- {result['url']}")
+                logger.info(f"重复，跳过：{engine_name} - {keyword} - {result['title']}")
                 return True
                 
             # 检查是否过期
             is_expired = engine.check_expired(result['url'])
             result['is_expired'] = is_expired
             
-            # 保存结果
-            self.db.save_result(result)
-            
             # 提交反馈
             if is_expired:
                 if not engine.submit_feedback(result):
                     logger.error("反馈提交失败")
                     return False
+                
+             # 保存结果
+            self.db.save_result(result)
                     
             return True
             
@@ -91,8 +90,6 @@ class SearchProcessor:
             logger.error(f"登录失败: {engine_name}")
             return
             
-        is_completed = False
-        
         try:
             engine.search(keyword)
             while True:
@@ -101,7 +98,6 @@ class SearchProcessor:
                 if not results:
                     logger.info(f"搜索完成: {engine_name} - {keyword}")
                     self.db.save_progress(keyword, engine_name, is_done=True)
-                    is_completed = True
                     break
                     
                 for result in results:
@@ -113,23 +109,16 @@ class SearchProcessor:
                     if not self.process_single_result(engine, result, keyword, engine_name):
                         return
                         
-                # 保存当前进度
-                self.db.save_progress(keyword, engine_name, is_done=False)
-                
                 # 尝试下一页
                 if not engine.next_page():
                     logger.info(f"已到最后一页: {engine_name} - {keyword}")
                     self.db.save_progress(keyword, engine_name, is_done=True)
-                    is_completed = True
                     break
                     
                 time.sleep(2)  # 翻页后等待加载
                 
         except Exception as e:
             logger.error(f"处理关键词出错: {str(e)}")
-        finally:
-            if not is_completed:
-                self.db.save_progress(keyword, engine_name, is_done=False)
 
     def run(self):
         """运行主程序"""

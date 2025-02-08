@@ -1,5 +1,6 @@
 .history
 error_logs
+.idea
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

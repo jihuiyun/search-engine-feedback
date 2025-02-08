@@ -139,14 +139,25 @@ class BaiduEngine(SearchEngine):
             
             for item in result_items:
                 try:
+                    # 获取标题元素和文本
+                    # 尝试不同的标题选择器
+                    title_element = None
+                    for selector in ["h3.t a", "h3.c-title a", "h3 a"]:
+                        try:
+                            title_element = item.find_element(By.CSS_SELECTOR, selector)
+                            break
+                        except NoSuchElementException:
+                            continue
+                    
+                    if not title_element:
+                        continue
+                    
+                    title = title_element.text.strip()
+
                     # 从父级 div 的 mu 属性获取真实 URL
-                    url = item.get_attribute('mu')
+                    url = item.get_attribute('mu') or title_element.get_attribute('href')
                     if not url:
                         continue
-                        
-                    # 获取标题元素和文本
-                    title_element = item.find_element(By.CSS_SELECTOR, "h3.c-title a")
-                    title = title_element.text.strip()
                     
                     result = {
                         'title': title,
@@ -222,7 +233,7 @@ class BaiduEngine(SearchEngine):
             # 等待反馈弹窗加载
             try:
                 self.wait.until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, "div.fb-content"))
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "div.fb-modal"))
                 )
                 logger.info("反馈弹窗已加载，请手动选择「内容或图片陈旧」选项...")
                 
@@ -274,7 +285,7 @@ class BaiduEngine(SearchEngine):
         try:
             # 查找下一页按钮
             next_link = self.wait.until(
-                EC.element_to_be_clickable((By.LINK_TEXT, "下一页>"))
+                EC.element_to_be_clickable((By.LINK_TEXT, "下一页 >"))
             )
             
             if not next_link:

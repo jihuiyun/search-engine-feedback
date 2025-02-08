@@ -142,25 +142,25 @@ class Database:
             logger.error(f"数据库错误: 保存进度失败 - {str(e)}")
             return False
 
-    def get_existing_result(self, url: str, keyword: str = None, search_engine: str = None) -> Dict[str, Any]:
+    def get_existing_result(self, url: str = None, keyword: str = None, search_engine: str = None, title: str = None) -> Dict[str, Any]:
         """获取已存在的 URL 记录详情"""
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
-                if keyword and search_engine:
-                    # 如果提供了关键词和搜索引擎，则进行精确匹配
-                    cursor.execute('''
-                        SELECT keyword, title, is_expired 
-                        FROM results 
-                        WHERE url = ? AND keyword = ? AND search_engine = ?
-                    ''', (url, keyword, search_engine))
-                else:
-                    # 否则只按 URL 匹配
+                if url:
+                    # 如果提供了 url 则进行精确匹配
                     cursor.execute('''
                         SELECT keyword, title, is_expired 
                         FROM results 
                         WHERE url = ?
                     ''', (url,))
+                elif keyword and search_engine and title:
+                    # 如果提供了关键词、搜索引擎和标题，则进行精确匹配
+                    cursor.execute('''
+                        SELECT keyword, title, is_expired 
+                        FROM results 
+                        WHERE keyword = ? AND search_engine = ? AND title = ?
+                    ''', (keyword, search_engine, title))
                 
                 result = cursor.fetchone()
                 if result:
@@ -171,7 +171,7 @@ class Database:
                     }
                 return None
         except Exception as e:
-            logger.error(f"数据库错误: 获取 URL 记录失败 - {str(e)}")
+            logger.error(f"数据库错误: 获取记录失败 - {str(e)}")
             return None
 
     def check_keyword_done(self, keyword: str, search_engine: str) -> bool:
