@@ -132,45 +132,38 @@ class BaiduEngine(SearchEngine):
         results = []
         try:
             # 等待搜索结果加载
-            self.wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "div.result.c-container"))
-            )
-            time.sleep(2)
+            self.wait.until(EC.presence_of_element_located((By.ID, "content_left")))
             
-            # 获取所有搜索结果
-            result_items = self.driver.find_elements(
-                By.CSS_SELECTOR, 
-                "div.result.c-container, div.result.c-container.new-pmd"
-            )
+            # 获取所有搜索结果项
+            result_items = self.driver.find_elements(By.CSS_SELECTOR, "div.result.c-container")
             
             for item in result_items:
                 try:
-                    # 尝试不同的标题选择器
-                    title_element = None
-                    for selector in ["h3.t a", "h3.c-title a", "h3 a"]:
-                        try:
-                            title_element = item.find_element(By.CSS_SELECTOR, selector)
-                            break
-                        except NoSuchElementException:
-                            continue
-                    
-                    if not title_element:
+                    # 从父级 div 的 mu 属性获取真实 URL
+                    url = item.get_attribute('mu')
+                    if not url:
                         continue
+                        
+                    # 获取标题元素和文本
+                    title_element = item.find_element(By.CSS_SELECTOR, "h3.c-title a")
+                    title = title_element.text.strip()
                     
                     result = {
-                        'title': title_element.text.strip(),
-                        'url': title_element.get_attribute('href'),
+                        'title': title,
+                        'url': url,
                         'element': item
                     }
                     results.append(result)
                     
-                except NoSuchElementException:
+                except Exception as e:
+                    logger.error(f"处理搜索结果项时出错: {str(e)}")
                     continue
-                    
-        except Exception as e:
-            logger.error(f"获取搜索结果出错: {str(e)}")
+                
+            return results
             
-        return results
+        except Exception as e:
+            logger.error(f"获取搜索结果失败: {str(e)}")
+            return []
 
     def check_expired(self, url: str) -> bool:
         """检查链接是否过期"""
@@ -214,6 +207,14 @@ class BaiduEngine(SearchEngine):
             if len(self.driver.window_handles) > 1:
                 self.driver.switch_to.window(self.driver.window_handles[0])
                 time.sleep(1)
+            
+            # 高亮显示当前处理的搜索结果
+            if 'element' in result:
+                self.driver.execute_script("""
+                    arguments[0].style.backgroundColor = '#ff0000';
+                    arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});
+                """, result['element'])
+                time.sleep(1)  # 等待滚动完成
             
             # 滚动到页面底部
             self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")

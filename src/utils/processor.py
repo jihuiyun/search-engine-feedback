@@ -54,12 +54,16 @@ class SearchProcessor:
                     result['search_engine'] = engine_name
                     
                     # 检查是否已处理过
-                    existing_result = self.db.get_existing_result(
-                        result['url'], 
-                        keyword,
-                        engine_name
-                    )
+                    existing_result = self.db.get_existing_result(result['url'])
                     if existing_result:
+                        # 判断是否不是当前词条的记录，否则保存记录，因为源自不同的搜索记录
+                        same = self.db.get_existing_result(result['url'], keyword, engine_name)
+
+                        if not same:
+                            result['is_expired'] = existing_result['is_expired']
+                            self.db.save_result(result)
+
+                        logger.info(f"重复处理，跳过：【{engine_name} - {keyword}】- {result['url']}")
                         continue
                         
                     # 检查是否过期
