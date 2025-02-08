@@ -150,11 +150,31 @@ class BrowserManager:
         cookie_file = os.path.join(self.cookies_dir, f"{domain}.txt")
         try:
             cookies = self.driver.get_cookies()
+            if not cookies:
+                logger.warning(f"没有可保存的 cookies: {domain}")
+                return
+            
+            # 先读取现有内容
+            existing_content = ''
+            if os.path.exists(cookie_file):
+                with open(cookie_file, 'r', encoding='utf-8') as f:
+                    existing_content = f.read().strip()
+            
+            # 将新的 cookies 转换为文本
             cookie_text = '; '.join([f"{cookie['name']}={cookie['value']}" for cookie in cookies])
             
+            # 如果现有内容非空且与新内容不同，创建备份
+            if existing_content and existing_content != cookie_text:
+                backup_file = f"{cookie_file}.bak"
+                with open(backup_file, 'w', encoding='utf-8') as f:
+                    f.write(existing_content)
+                logger.info(f"已创建cookie备份: {backup_file}")
+            
+            # 保存新的 cookies
             with open(cookie_file, 'w', encoding='utf-8') as f:
                 f.write(cookie_text)
             logger.info(f"Cookie管理: 已保存 {domain} 的 cookies")
+            
         except Exception as e:
             logger.error(f"Cookie错误: 保存 {domain} 的 cookies 失败 - {str(e)}")
     
@@ -162,22 +182,39 @@ class BrowserManager:
         """加载指定域名的 cookies"""
         cookie_file = os.path.join(self.cookies_dir, f"{domain}.txt")
         if not os.path.exists(cookie_file):
+            logger.debug(f"Cookie文件不存在: {cookie_file}")
             return False
         
         try:
+            # 先访问对应域名的网站
+            if domain == 'baidu.com':
+                self.driver.get('https://www.baidu.com')
+            elif domain == 'bing.com':
+                self.driver.get('https://cn.bing.com')
+            time.sleep(2)  # 等待页面加载
+            
             with open(cookie_file, 'r', encoding='utf-8') as f:
                 cookie_text = f.read().strip()
-                if cookie_text:
-                    cookie_list = [item.strip() for item in cookie_text.split(';') if item.strip()]
-                    for cookie_item in cookie_list:
+                if not cookie_text:
+                    logger.warning(f"Cookie文件为空: {cookie_file}")
+                    return False
+                
+                cookie_list = [item.strip() for item in cookie_text.split(';') if item.strip()]
+                for cookie_item in cookie_list:
+                    try:
                         name, value = cookie_item.split('=', 1)
                         self.driver.add_cookie({
                             'name': name.strip(),
                             'value': value.strip(),
-                            'domain': f".{domain}"
+                            'domain': domain  # 移除前导点号
                         })
+                    except Exception as e:
+                        logger.error(f"添加单个cookie失败: {cookie_item} - {str(e)}")
+                        continue
+                    
             logger.info(f"已加载 {domain} 的 cookies")
             return True
+            
         except Exception as e:
             logger.error(f"加载 cookies 失败: {str(e)}")
             return False 

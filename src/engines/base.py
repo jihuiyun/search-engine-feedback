@@ -108,39 +108,27 @@ class SearchEngine(ABC):
         """获取当前页码"""
         pass 
 
-    def ensure_login(self) -> bool:
-        """确保登录状态"""
-        try:
-            # 先尝试加载本地 cookies
-            if not self.cookies_loaded:
-                domain = self.get_domain()
-                if self.browser_manager.load_cookies(domain):
-                    logger.info(f"已加载 {domain} 的本地 cookies")
+    def load_cookies_and_login(self) -> bool:
+        """加载 cookies 并尝试登录"""
+        if self.cookies_loaded:
+            return True
+            
+        domain = self.get_domain()
+        if domain in ['baidu.com', 'bing.com']:  # 只对百度和必应尝试 cookie 登录
+            if self.browser_manager.load_cookies(domain):
+                self.driver.refresh()
+                time.sleep(2)
+                if self.check_login():
                     self.cookies_loaded = True
-                    # 刷新页面使 cookies 生效
-                    self.driver.refresh()
-                    time.sleep(2)
-
-            # 检查登录状态
-            if self.check_login():
-                logger.info("登录状态检查：已登录")
-                return True
-
-            # 需要登录，等待手动登录
-            logger.info("检测到需要登录，请在浏览器中完成登录...")
+                    return True
+            # 等待手动登录
+            logger.info(f"等待用户手动登录 {domain}...")
             while not self.check_login():
                 time.sleep(2)
-                if not self.ensure_browser():
-                    return False
-
-            # 登录成功，保存新的 cookies
-            logger.info("登录成功，保存 cookies")
-            self.browser_manager.save_cookies(self.get_domain())
+            self.browser_manager.save_cookies(domain)
+            self.cookies_loaded = True
             return True
-
-        except Exception as e:
-            logger.error(f"登录过程出错: {str(e)}")
-            return False
+        return True  # 其他搜索引擎不需要登录
 
     @abstractmethod
     def check_login(self) -> bool:

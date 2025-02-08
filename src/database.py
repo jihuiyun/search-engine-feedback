@@ -21,32 +21,22 @@ class Database:
                 SELECT name FROM sqlite_master 
                 WHERE type='table' AND name='progress'
             """)
-            table_exists = cursor.fetchone() is not None
+            if cursor.fetchone():
+                # 删除旧的 progress 表
+                cursor.execute("DROP TABLE progress")
+                logger.info("数据库更新: 已删除旧的 progress 表")
             
-            if table_exists:
-                # 检查 is_done 列是否存在
-                cursor.execute("PRAGMA table_info(progress)")
-                columns = [column[1] for column in cursor.fetchall()]
-                if 'is_done' not in columns:
-                    # 添加 is_done 列
-                    cursor.execute("""
-                        ALTER TABLE progress 
-                        ADD COLUMN is_done BOOLEAN NOT NULL DEFAULT 0
-                    """)
-                    logger.info("数据库更新: 已向 progress 表添加 is_done 列")
-            else:
-                # 创建新的 progress 表
-                cursor.execute('''
-                    CREATE TABLE progress (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        keyword TEXT NOT NULL,
-                        search_engine TEXT NOT NULL,
-                        current_page INTEGER NOT NULL DEFAULT 1,
-                        is_done BOOLEAN NOT NULL DEFAULT 0,
-                        UNIQUE(keyword, search_engine)
-                    )
-                ''')
-                logger.info("数据库初始化: 已创建 progress 表")
+            # 创建新的 progress 表
+            cursor.execute('''
+                CREATE TABLE progress (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    keyword TEXT NOT NULL,
+                    search_engine TEXT NOT NULL,
+                    is_done BOOLEAN NOT NULL DEFAULT 0,
+                    UNIQUE(keyword, search_engine)
+                )
+            ''')
+            logger.info("数据库初始化: 已创建 progress 表")
             
             # 检查 results 表是否存在
             cursor.execute("""
@@ -85,27 +75,35 @@ class Database:
             logger.error(f"数据库错误: 检查 URL 是否存在失败 - {str(e)}")
             return False
 
-    def save_result(self, result: dict) -> bool:
-        """保存搜索结果，即使 URL 已存在也保存"""
+    def save_result(self, result: Dict[str, Any]) -> bool:
+        """保存搜索结果（添加去重逻辑）"""
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
+                # 检查是否存在相同记录
                 cursor.execute('''
-                    INSERT INTO results (
-                        keyword, title, url, search_engine, is_expired
-                    ) VALUES (?, ?, ?, ?, ?)
-                ''', (
-                    result['keyword'],
-                    result['title'],
-                    result['url'],
-                    result['search_engine'],
-                    result['is_expired']
-                ))
-                conn.commit()
-                logger.debug(f"已保存搜索结果: {result['title'][:30]}...")
+                    SELECT id FROM results 
+                    WHERE keyword = ? AND search_engine = ? AND url = ?
+                ''', (result['keyword'], result['search_engine'], result['url']))
+                
+                if cursor.fetchone() is None:
+                    # 不存在则插入新记录
+                    cursor.execute('''
+                        INSERT INTO results (
+                            keyword, search_engine, url, title, 
+                            is_expired, last_updated
+                        ) VALUES (?, ?, ?, ?, ?, datetime('now'))
+                    ''', (
+                        result['keyword'],
+                        result['search_engine'],
+                        result['url'],
+                        result['title'],
+                        result['is_expired']
+                    ))
+                    conn.commit()
                 return True
         except Exception as e:
-            logger.error(f"数据库错误: 保存搜索结果失败 - {str(e)}")
+            logger.error(f"保存搜索结果失败: {str(e)}")
             return False
 
     def get_progress(self, keyword: str, search_engine: str) -> int:
@@ -125,35 +123,45 @@ class Database:
             logger.error(f"数据库错误: 获取进度失败 - {str(e)}")
             return 1
 
-    def save_progress(self, keyword: str, search_engine: str, current_page: int, is_done: bool = False) -> bool:
+    def save_progress(self, keyword: str, search_engine: str, is_done: bool = False) -> bool:
         """保存搜索进度"""
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 cursor.execute('''
-                    INSERT INTO progress (keyword, search_engine, current_page, is_done)
-                    VALUES (?, ?, ?, ?)
+                    INSERT INTO progress (keyword, search_engine, is_done)
+                    VALUES (?, ?, ?)
                     ON CONFLICT(keyword, search_engine) 
-                    DO UPDATE SET current_page = ?, is_done = ?
-                ''', (keyword, search_engine, current_page, is_done, current_page, is_done))
+                    DO UPDATE SET is_done = ?
+                ''', (keyword, search_engine, is_done, is_done))
                 conn.commit()
-                status = "已完成" if is_done else f"进行到第 {current_page} 页"
+                status = "已完成" if is_done else "进行中"
                 logger.debug(f"已更新进度: {search_engine} 搜索 '{keyword}' {status}")
                 return True
         except Exception as e:
             logger.error(f"数据库错误: 保存进度失败 - {str(e)}")
             return False
 
-    def get_existing_result(self, url: str) -> Dict[str, Any]:
+    def get_existing_result(self, url: str, keyword: str = None, search_engine: str = None) -> Dict[str, Any]:
         """获取已存在的 URL 记录详情"""
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
-                cursor.execute('''
-                    SELECT keyword, title, is_expired 
-                    FROM results 
-                    WHERE url = ?
-                ''', (url,))
+                if keyword and search_engine:
+                    # 如果提供了关键词和搜索引擎，则进行精确匹配
+                    cursor.execute('''
+                        SELECT keyword, title, is_expired 
+                        FROM results 
+                        WHERE url = ? AND keyword = ? AND search_engine = ?
+                    ''', (url, keyword, search_engine))
+                else:
+                    # 否则只按 URL 匹配
+                    cursor.execute('''
+                        SELECT keyword, title, is_expired 
+                        FROM results 
+                        WHERE url = ?
+                    ''', (url,))
+                
                 result = cursor.fetchone()
                 if result:
                     return {
