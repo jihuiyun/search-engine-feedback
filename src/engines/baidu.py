@@ -208,14 +208,6 @@ class BaiduEngine(SearchEngine):
                 self.driver.switch_to.window(self.driver.window_handles[0])
                 time.sleep(1)
             
-            # 高亮显示当前处理的搜索结果
-            if 'element' in result:
-                self.driver.execute_script("""
-                    arguments[0].style.backgroundColor = '#ff0000';
-                    arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});
-                """, result['element'])
-                time.sleep(1)  # 等待滚动完成
-            
             # 滚动到页面底部
             self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
             time.sleep(2)

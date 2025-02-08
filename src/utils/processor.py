@@ -1,7 +1,7 @@
 import yaml
 import logging
 import time
-from typing import Dict
+from typing import Dict, Any
 from selenium.webdriver.remote.webdriver import WebDriver
 from src.database import Database
 from src.engines.base import SearchEngine
@@ -20,6 +20,62 @@ class SearchProcessor:
         self.engines = engines
         # 初始化数据库
         self.db = Database(self.config['database']['path'])
+
+    def highlight_result(self, result: Dict[str, Any], highlight: bool = True):
+        """高亮或取消高亮搜索结果"""
+        if 'element' not in result:
+            return
+        
+        color = '#ff0000' if highlight else 'transparent'
+        try:
+            self.driver.execute_script("""
+                arguments[0].style.backgroundColor = arguments[1];
+                if (arguments[1] !== 'transparent') {
+                    arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});
+                }
+            """, result['element'], color)
+            if highlight:
+                time.sleep(1)  # 等待滚动和高亮效果
+        except Exception as e:
+            logger.error(f"{'高亮' if highlight else '取消高亮'}搜索结果失败: {str(e)}")
+
+    def process_single_result(self, engine: SearchEngine, result: Dict[str, Any], keyword: str, engine_name: str) -> bool:
+        """处理单个搜索结果"""
+        try:
+            # 高亮当前处理的结果
+            self.highlight_result(result, True)
+            
+            # 检查是否已处理过
+            existing_result = self.db.get_existing_result(result['url'])
+            if existing_result:
+                # 判断是否不是当前词条的记录
+                same = self.db.get_existing_result(result['url'], keyword, engine_name)
+                
+                if not same:
+                    result['is_expired'] = existing_result['is_expired']
+                    self.db.save_result(result)
+                    
+                logger.info(f"重复处理，跳过：【{engine_name} - {keyword}】- {result['url']}")
+                return True
+                
+            # 检查是否过期
+            is_expired = engine.check_expired(result['url'])
+            result['is_expired'] = is_expired
+            
+            # 保存结果
+            self.db.save_result(result)
+            
+            # 提交反馈
+            if is_expired:
+                if not engine.submit_feedback(result):
+                    logger.error("反馈提交失败")
+                    return False
+                    
+            return True
+            
+        finally:
+            # 取消高亮
+            self.highlight_result(result, False)
 
     def process_keyword(self, engine_name: str, keyword: str):
         """处理单个关键词"""
@@ -53,32 +109,10 @@ class SearchProcessor:
                     result['keyword'] = keyword
                     result['search_engine'] = engine_name
                     
-                    # 检查是否已处理过
-                    existing_result = self.db.get_existing_result(result['url'])
-                    if existing_result:
-                        # 判断是否不是当前词条的记录，否则保存记录，因为源自不同的搜索记录
-                        same = self.db.get_existing_result(result['url'], keyword, engine_name)
-
-                        if not same:
-                            result['is_expired'] = existing_result['is_expired']
-                            self.db.save_result(result)
-
-                        logger.info(f"重复处理，跳过：【{engine_name} - {keyword}】- {result['url']}")
-                        continue
+                    # 处理单个结果
+                    if not self.process_single_result(engine, result, keyword, engine_name):
+                        return
                         
-                    # 检查是否过期
-                    is_expired = engine.check_expired(result['url'])
-                    result['is_expired'] = is_expired
-                    
-                    # 保存结果
-                    self.db.save_result(result)
-                    
-                    # 提交反馈
-                    if is_expired:
-                        if not engine.submit_feedback(result):
-                            logger.error("反馈提交失败")
-                            return
-                            
                 # 保存当前进度
                 self.db.save_progress(keyword, engine_name, is_done=False)
                 
