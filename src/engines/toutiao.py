@@ -28,6 +28,32 @@ class ToutiaoEngine(SearchEngine):
             search_url = self.engine_config['url'].format(keyword=keyword)
             self.driver.get(search_url)
             time.sleep(3)
+
+            # 检测验证码弹窗
+            try:
+                # 等待验证码弹窗出现
+                captcha_frame = self.wait.until(
+                    EC.presence_of_element_located((
+                        By.XPATH, 
+                        "//*[contains(text(), '请完成下列验证后继续')]"
+                    ))
+                )
+                logger.info("检测到验证码弹窗，等待用户处理...")
+
+                # 等待验证码弹窗消失 - 通过检查文本是否不可见
+                self.wait.until(
+                    EC.invisibility_of_element_located((
+                        By.XPATH,
+                        "//*[contains(text(), '请完成下列验证后继续')]"
+                    ))
+                )
+                logger.info("验证码处理完成")
+                time.sleep(2)  # 额外等待确保页面加载完成
+
+            except TimeoutException:
+                # 没有验证码弹窗，继续正常流程
+                pass
+
         except Exception as e:
             logger.error(f"搜索出错: {str(e)}")
             return None
@@ -52,8 +78,6 @@ class ToutiaoEngine(SearchEngine):
             
             for index, item in enumerate(result_items):
                 try:
-                    print(f"\n处理第 {index + 1} 个结果项:")
-
                     # 获取标题和链接 - 尝试多个可能的选择器
                     title_element = None
                     for selector in ["a", "a.cs-title", ".cs-title a", "div.cs-title a"]:
@@ -76,7 +100,6 @@ class ToutiaoEngine(SearchEngine):
                             By.CSS_SELECTOR, 
                             "div.cs-view.cs-view-block.cs-source-extra"
                         )
-                        print("成功找到反馈按钮")
                     except NoSuchElementException:
                         print("未找到反馈按钮")
                         continue
@@ -93,7 +116,6 @@ class ToutiaoEngine(SearchEngine):
                         'element': item,
                         'feedback_element': feedback_element
                     }
-                    print(f"成功解析结果: {result['title']}")
                     results.append(result)
                     
                 except NoSuchElementException as e:
@@ -170,54 +192,89 @@ class ToutiaoEngine(SearchEngine):
             self.wait.until(
                 EC.presence_of_element_located((By.XPATH, "//div[contains(text(), '举报反馈')]"))
             )
-            time.sleep(1)  # 额外等待确保菜单完全显示
-            
+
             # 使用精确的CSS选择器查找举报反馈按钮
             report_btn = self.wait.until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, "div.cs-trigger-popup.cs-trigger-popup-open>div"))
             )
             report_btn.click()
-            time.sleep(2)
-            
-            # 等待举报对话框出现
-            report_dialog = self.wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "div.cs-feedback-wrap.cs-feedback-wrap-open"))
-            )
-            
-            # 选择举报类型
-            report_types = report_dialog.find_elements(By.CSS_SELECTOR, "div.cs-feedback-wrap.cs-feedback-wrap-open div.report-type-item")
-            match_strings = ["页面打不开，无法找到网页", "视频内容陈旧", "内容陈旧"] 
-            
-            for type_item in report_types:
-                if any(match_string in type_item.text for match_string in match_strings):
-                    type_item.click()
-                    print("选择举报类型:", type_item.text)
-                    break
-            
             time.sleep(1)
-            
-            # 填写举报描述
-            description_input = self.wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "div.cs-feedback-wrap.cs-feedback-wrap-open textarea.cs-feedback-detail"))
-            )
-            description_input.clear()
-            description_input.send_keys(self.feedback_config['description'])
-            print("已填写举报描述")
-            
-            # 填写联系方式
-            email_input = self.wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "div.cs-feedback-wrap.cs-feedback-wrap-open input.cs-feedback-contact"))
-            )
-            email_input.clear()
-            email_input.send_keys(self.feedback_config['email'])
-            print("已填写联系方式")
-            
+
             # 提交举报
-            submit_btn = report_dialog.find_element(By.XPATH, "//div[contains(@class, 'cs-view') and contains(@class, 'cursor-pointer')]//span[text()='确定']")
-            print("找到提交按钮")
-            submit_btn.click()
-            time.sleep(2)
-            print("已点击提交按钮")
+            try:
+                # 等待举报对话框出现
+                report_dialog = self.wait.until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "div.cs-feedback-wrap.cs-feedback-wrap-open"))
+                )
+
+                # 选择举报类型
+                report_types = self.wait.until(
+                    EC.presence_of_all_elements_located((
+                        By.CSS_SELECTOR, 
+                        "div.cs-view.cs-view-flex.align-items-center.flex-row.cs-grid-cell.cursor-pointer"
+                    ))
+                )
+
+                # 选择举报类型
+                match_strings = ["页面打不开，无法找到网页", "视频内容陈旧", "内容陈旧"] 
+                report_types = self.wait.until(
+                    EC.presence_of_all_elements_located((
+                        By.CSS_SELECTOR, 
+                        "div.cs-feedback-wrap.cs-feedback-wrap-open div.cs-view.cs-view-flex.align-items-center.flex-row.cs-grid-cell.cursor-pointer"
+                    ))
+                )
+                
+                for type_item in report_types:
+                    if any(match_string in type_item.text for match_string in match_strings):
+                        type_item.click()
+                        print("选择举报类型:", type_item.text)
+                        break
+                
+                # 填写举报描述
+                description_input = self.wait.until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "div.cs-feedback-wrap.cs-feedback-wrap-open textarea.cs-feedback-detail"))
+                )
+                description_input.clear()
+                description_input.send_keys(self.feedback_config['description'])
+                print("已填写举报描述")
+                
+                # 填写联系方式
+                email_input = self.wait.until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "div.cs-feedback-wrap.cs-feedback-wrap-open input.cs-feedback-contact"))
+                )
+                email_input.clear()
+                email_input.send_keys(self.feedback_config['email'])
+                print("已填写联系方式")
+             
+                # 先等待确定按钮可见
+                submit_btn = self.wait.until(
+                    EC.presence_of_element_located((
+                        By.XPATH, 
+                        "//div[contains(@class, 'cs-feedback-wrap-open')]//span[text()='确定']"
+                    ))
+                )
+                
+                # 确保按钮在视图中
+                self.driver.execute_script("arguments[0].scrollIntoView(true);", submit_btn)
+                time.sleep(1)
+                
+                # 尝试用 JavaScript 点击
+                self.driver.execute_script("arguments[0].click();", submit_btn)
+                print("已点击提交按钮")
+                
+                # 等待反馈对话框消失
+                self.wait.until(
+                    EC.invisibility_of_element_located((
+                        By.CSS_SELECTOR, 
+                        "div.cs-feedback-wrap.cs-feedback-wrap-open"
+                    ))
+                )
+
+                print("成功提交反馈！")
+                
+            except Exception as e:
+                logger.error(f"点击提交按钮失败: {str(e)}")
+                raise
             
         except Exception as e:
             print(f"提交反馈失败: {str(e)}")

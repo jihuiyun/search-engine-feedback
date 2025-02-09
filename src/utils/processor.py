@@ -133,6 +133,7 @@ class SearchProcessor:
                         logger.info(f"跳过已完成关键词: {engine_name} 搜索 '{keyword}'")
                         continue
                         
+                    logger.info(f"开始关键词搜索: {engine_name} 搜索 '{keyword}'")
                     self.process_keyword(engine_name, keyword)
                 logger.info(f"完成 {engine_name} 引擎的所有关键词处理")
         finally:
