@@ -11,6 +11,7 @@ import json
 from selenium.webdriver.support.ui import WebDriverWait
 import urllib3
 import sqlite3
+from selenium.webdriver.common.action_chains import ActionChains
 
 # 设置 urllib3 的日志级别为 ERROR，隐藏连接警告
 urllib3.disable_warnings()
@@ -151,7 +152,7 @@ class BaiduEngine(SearchEngine):
                     
                     if not title_element:
                         continue
-                    
+
                     title = title_element.text.strip()
 
                     # 从父级 div 的 mu 属性获取真实 URL
@@ -232,42 +233,66 @@ class BaiduEngine(SearchEngine):
             
             # 等待反馈弹窗加载
             try:
+                # 等待弹窗完全加载
                 self.wait.until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, "div.fb-modal"))
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "#fb_baidu_list_dialog"))
                 )
-                logger.info("反馈弹窗已加载，请手动选择「内容或图片陈旧」选项...")
-                
-                # 等待用户选择选项
-                input("请在选择完「内容或图片陈旧」后按回车继续...")
                 
                 # 填写反馈描述
                 description = (
                     "网页打不开，提示内容已删除或找不到该网页，请删除快照，且快照包含91y关键词信息为不实内容，"
                     "误导91y游戏用户，已严重影响到浮云公司的商誉和正常的经营秩序"
                 )
-                description_input = self.wait.until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, "textarea.fb-textarea"))
-                )
-                description_input.clear()
-                description_input.send_keys(description)
                 
-                # 填写联系邮箱
-                email_input = self.wait.until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, "input.fb-email"))
-                )
-                email_input.clear()
-                email_input.send_keys("huiyun@fuyuncn.com")
+                # 模拟真实的键盘输入
+                self.driver.execute_script("""
+                    function triggerEvent(element, eventType) {
+                        const event = new Event(eventType, { bubbles: true });
+                        element.dispatchEvent(event);
+                    }
+                    
+                    function simulateTyping(element, text) {
+                        element.focus();
+                        triggerEvent(element, 'focus');
+                        element.value = text;
+                        triggerEvent(element, 'input');
+                        triggerEvent(element, 'change');
+                        triggerEvent(element, 'blur');
+                    }
+                    
+                    const textarea = document.querySelector('#fb_baidu_list_dialog div.fb-textarea.fb-content-block>textarea');
+                    const emailInput = document.querySelector('#fb_baidu_list_dialog input.fb-email');
+                    
+                    if (textarea) {
+                        simulateTyping(textarea, arguments[0]);
+                    }
+                    
+                    if (emailInput) {
+                        simulateTyping(emailInput, arguments[1]);
+                    }
+                """, description, "huiyun@fuyuncn.com")
+                time.sleep(1)
                 
                 # 点击提交按钮
                 submit_btn = self.wait.until(
-                    EC.element_to_be_clickable((By.CSS_SELECTOR, "a.fb-btn-submit"))
+                    EC.element_to_be_clickable((By.CSS_SELECTOR, "#fb_list_post_save"))
                 )
                 submit_btn.click()
-                time.sleep(2)
+                time.sleep(1)
                 
                 # 等待用户完成安全验证
                 logger.info("请完成安全验证...")
-                input("请在完成安全验证后按回车继续...")
+                try:
+                      # 创建一个更长超时时间的 wait 对象
+                    long_wait = WebDriverWait(self.driver, 30)  # 等待最多 30s
+                    # 等待验证弹窗消失
+                    long_wait.until(
+                        EC.invisibility_of_element_located((By.CSS_SELECTOR, "#fb_baidu_list_dialog div.fb-vertify"))
+                    )
+                    logger.info("安全验证完成")
+                except TimeoutException:
+                    logger.error("等待安全验证超时（30秒）")
+                    return False
                 
                 logger.info("反馈提交成功")
                 return True
