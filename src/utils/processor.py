@@ -93,7 +93,6 @@ class SearchProcessor:
             
         try:
             engine.search(keyword)
-            self.db.save_progress(keyword, engine_name, is_done=True)
             while True:
                 results = engine.get_search_results()
                 
