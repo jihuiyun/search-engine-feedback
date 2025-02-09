@@ -89,7 +89,7 @@ class Database:
                         INSERT INTO results (
                             keyword, search_engine, url, title, 
                             is_expired, last_updated
-                        ) VALUES (?, ?, ?, ?, ?, datetime('now'))
+                        ) VALUES (?, ?, ?, ?, ?, datetime('now', '+8 hours'))
                     ''', (
                         result['keyword'],
                         result['search_engine'],
@@ -97,7 +97,19 @@ class Database:
                         result['title'],
                         result['is_expired']
                     ))
-                    conn.commit()
+                else:
+                    # 存在则更新记录
+                    cursor.execute('''
+                        UPDATE results 
+                        SET is_expired = ?, last_updated = datetime('now', '+8 hours')
+                        WHERE keyword = ? AND search_engine = ? AND url = ?
+                    ''', (
+                        result['is_expired'],
+                        result['keyword'],
+                        result['search_engine'],
+                        result['url']
+                    ))
+                conn.commit()
                 return True
         except Exception as e:
             logger.error(f"保存搜索结果失败: {str(e)}")
@@ -129,7 +141,8 @@ class Database:
                     INSERT INTO progress (keyword, search_engine, is_done)
                     VALUES (?, ?, ?)
                     ON CONFLICT(keyword, search_engine) 
-                    DO UPDATE SET is_done = ?
+                    DO UPDATE SET 
+                        is_done = ?
                 ''', (keyword, search_engine, is_done, is_done))
                 conn.commit()
                 status = "已完成" if is_done else "进行中"

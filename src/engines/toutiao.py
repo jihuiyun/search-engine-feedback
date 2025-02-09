@@ -27,19 +27,10 @@ class ToutiaoEngine(SearchEngine):
             
             search_url = self.engine_config['url'].format(keyword=keyword)
             self.driver.get(search_url)
-            time.sleep(3)
+            time.sleep(2)
 
             # 检测验证码弹窗
             try:
-                # 等待验证码弹窗出现
-                captcha_frame = self.wait.until(
-                    EC.presence_of_element_located((
-                        By.XPATH, 
-                        "//*[contains(text(), '请完成下列验证后继续')]"
-                    ))
-                )
-                logger.info("检测到验证码弹窗，等待用户处理...")
-
                 # 等待验证码弹窗消失 - 通过检查文本是否不可见
                 self.wait.until(
                     EC.invisibility_of_element_located((
@@ -78,6 +69,8 @@ class ToutiaoEngine(SearchEngine):
             
             for index, item in enumerate(result_items):
                 try:
+                    print(f"\n处理第 {index + 1} 个结果项:")
+
                     # 获取标题和链接 - 尝试多个可能的选择器
                     title_element = None
                     for selector in ["a", "a.cs-title", ".cs-title a", "div.cs-title a"]:
@@ -172,7 +165,7 @@ class ToutiaoEngine(SearchEngine):
             self.driver.switch_to.window(current_window)
             time.sleep(1)  # 等待切换完成
 
-    def submit_feedback(self, result: Dict[str, Any]) -> None:
+    def submit_feedback(self, result: Dict[str, Any]) -> bool:
         """提交反馈"""
         try:
             # 确保在原始窗口
@@ -203,7 +196,7 @@ class ToutiaoEngine(SearchEngine):
             # 提交举报
             try:
                 # 等待举报对话框出现
-                report_dialog = self.wait.until(
+                self.wait.until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, "div.cs-feedback-wrap.cs-feedback-wrap-open"))
                 )
 
@@ -271,13 +264,14 @@ class ToutiaoEngine(SearchEngine):
                 )
 
                 print("成功提交反馈！")
-                
+                return True
             except Exception as e:
                 logger.error(f"点击提交按钮失败: {str(e)}")
                 raise
             
         except Exception as e:
             print(f"提交反馈失败: {str(e)}")
+            return False
 
     def next_page(self) -> bool:
         """跳转到下一页"""

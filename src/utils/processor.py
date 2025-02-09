@@ -93,6 +93,7 @@ class SearchProcessor:
             
         try:
             engine.search(keyword)
+            self.db.save_progress(keyword, engine_name, is_done=True)
             while True:
                 results = engine.get_search_results()
                 
@@ -116,7 +117,7 @@ class SearchProcessor:
                     self.db.save_progress(keyword, engine_name, is_done=True)
                     break
                     
-                time.sleep(2)  # 翻页后等待加载
+                time.sleep(1)  # 翻页后等待加载
                 
         except Exception as e:
             logger.error(f"处理关键词出错: {str(e)}")
