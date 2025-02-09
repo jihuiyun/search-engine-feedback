@@ -21,22 +21,19 @@ class Database:
                 SELECT name FROM sqlite_master 
                 WHERE type='table' AND name='progress'
             """)
-            if cursor.fetchone():
-                # 删除旧的 progress 表
-                cursor.execute("DROP TABLE progress")
-                logger.info("数据库更新: 已删除旧的 progress 表")
             
             # 创建新的 progress 表
-            cursor.execute('''
-                CREATE TABLE progress (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    keyword TEXT NOT NULL,
-                    search_engine TEXT NOT NULL,
-                    is_done BOOLEAN NOT NULL DEFAULT 0,
-                    UNIQUE(keyword, search_engine)
-                )
-            ''')
-            logger.info("数据库初始化: 已创建 progress 表")
+            if not cursor.fetchone():
+                cursor.execute('''
+                    CREATE TABLE progress (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        keyword TEXT NOT NULL,
+                        search_engine TEXT NOT NULL,
+                        is_done BOOLEAN NOT NULL DEFAULT 0,
+                        UNIQUE(keyword, search_engine)
+                    )
+                ''')
+                logger.info("数据库初始化: 已创建 progress 表")
             
             # 检查 results 表是否存在
             cursor.execute("""

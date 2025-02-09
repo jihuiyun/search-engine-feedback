@@ -9,6 +9,7 @@ from selenium.webdriver.remote.webdriver import WebDriver
 import logging
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import WebDriverWait
+from urllib.parse import unquote
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,7 @@ class ToutiaoEngine(SearchEngine):
             # 获取所有搜索结果项的容器
             result_items = self.driver.find_elements(
                 By.CSS_SELECTOR, 
-                "div.cs-view.pad-bottom-3.cs-view-block.cs-text.align-items-center"
+                "div.cs-view.pad-bottom-3.cs-view-block.cs-header.align-items-center"
             )
             
             print(f"找到 {len(result_items)} 个结果项")
@@ -52,8 +53,7 @@ class ToutiaoEngine(SearchEngine):
             for index, item in enumerate(result_items):
                 try:
                     print(f"\n处理第 {index + 1} 个结果项:")
-                    print(f"结果项HTML: {item.get_attribute('outerHTML')}")
-                    
+
                     # 获取标题和链接 - 尝试多个可能的选择器
                     title_element = None
                     for selector in ["a", "a.cs-title", ".cs-title a", "div.cs-title a"]:
@@ -70,25 +70,26 @@ class ToutiaoEngine(SearchEngine):
                     
                     # 获取反馈按钮
                     try:
-                        # 先尝试在当前元素的父元素中查找
-                        parent = item.find_element(By.XPATH, "./..")
-                        
+                         # 先尝试在当前元素的父元素中查找
+                        parent = item.find_element(By.XPATH, "./../../../../..")
                         feedback_element = parent.find_element(
                             By.CSS_SELECTOR, 
                             "div.cs-view.cs-view-block.cs-source-extra"
                         )
                         print("成功找到反馈按钮")
                     except NoSuchElementException:
-                        print("在父元素中未找到反馈按钮，尝试其他方法")
-                        # 尝试查找相邻元素
-                        feedback_element = item.find_element(
-                            By.XPATH,
-                            "following-sibling::div[contains(@class, 'cs-source-extra')]"
-                        )
+                        print("未找到反馈按钮")
+                        continue
+
+                    # 获取真实的 URL
+                    raw_url = title_element.get_attribute('href')
+                    real_url = raw_url.split('url=')[-1] if 'url=' in raw_url else raw_url
+                    real_url = real_url.split('&')[0]  # 取出第一个参数，确保只得到 URL
+                    real_url = unquote(real_url)  # 进行 URL 解码
                     
                     result = {
                         'title': title_element.text.strip(),
-                        'url': title_element.get_attribute('href'),
+                        'url': real_url,
                         'element': item,
                         'feedback_element': feedback_element
                     }
@@ -157,13 +158,13 @@ class ToutiaoEngine(SearchEngine):
                 self.driver.switch_to.window(self.driver.window_handles[0])
             
             # 滚动到元素可见
-            feedback_element = result['feedback_element']
-            self.driver.execute_script("arguments[0].scrollIntoView(true);", feedback_element)
+            element = result['element']
+            self.driver.execute_script("arguments[0].scrollIntoView(true);", element)
             time.sleep(1)
             
             # 鼠标悬停在反馈按钮上
             actions = ActionChains(self.driver)
-            actions.move_to_element(feedback_element).perform()
+            actions.move_to_element(result['feedback_element']).perform()
             
             # 等待悬停菜单出现并确认其中包含"举报反馈"选项
             self.wait.until(
@@ -180,13 +181,15 @@ class ToutiaoEngine(SearchEngine):
             
             # 等待举报对话框出现
             report_dialog = self.wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "div.report-dialog"))
+                EC.presence_of_element_located((By.CSS_SELECTOR, "div.cs-feedback-wrap.cs-feedback-wrap-open"))
             )
             
             # 选择举报类型
-            report_types = report_dialog.find_elements(By.CSS_SELECTOR, "div.report-type-item")
+            report_types = report_dialog.find_elements(By.CSS_SELECTOR, "div.cs-feedback-wrap.cs-feedback-wrap-open div.report-type-item")
+            match_strings = ["页面打不开，无法找到网页", "视频内容陈旧", "内容陈旧"] 
+            
             for type_item in report_types:
-                if "页面无法访问" in type_item.text:
+                if any(match_string in type_item.text for match_string in match_strings):
                     type_item.click()
                     print("选择举报类型:", type_item.text)
                     break
@@ -195,7 +198,7 @@ class ToutiaoEngine(SearchEngine):
             
             # 填写举报描述
             description_input = self.wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "div.report-content textarea"))
+                EC.presence_of_element_located((By.CSS_SELECTOR, "div.cs-feedback-wrap.cs-feedback-wrap-open textarea.cs-feedback-detail"))
             )
             description_input.clear()
             description_input.send_keys(self.feedback_config['description'])
@@ -203,14 +206,14 @@ class ToutiaoEngine(SearchEngine):
             
             # 填写联系方式
             email_input = self.wait.until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "div.report-contact input"))
+                EC.presence_of_element_located((By.CSS_SELECTOR, "div.cs-feedback-wrap.cs-feedback-wrap-open input.cs-feedback-contact"))
             )
             email_input.clear()
             email_input.send_keys(self.feedback_config['email'])
             print("已填写联系方式")
             
             # 提交举报
-            submit_btn = report_dialog.find_element(By.CSS_SELECTOR, "button.report-submit")
+            submit_btn = report_dialog.find_element(By.XPATH, "//div[contains(@class, 'cs-view') and contains(@class, 'cursor-pointer')]//span[text()='确定']")
             print("找到提交按钮")
             submit_btn.click()
             time.sleep(2)
@@ -218,37 +221,20 @@ class ToutiaoEngine(SearchEngine):
             
         except Exception as e:
             print(f"提交反馈失败: {str(e)}")
-            # 保存页面截图以便调试
-            try:
-                screenshot_path = f"feedback_error_{int(time.time())}.png"
-                self.driver.save_screenshot(screenshot_path)
-                print(f"错误截图已保存到: {screenshot_path}")
-                
-                # 保存页面源码
-                html_path = f"feedback_error_{int(time.time())}.html"
-                with open(html_path, 'w', encoding='utf-8') as f:
-                    f.write(self.driver.page_source)
-                print(f"页面源码已保存到: {html_path}")
-            except:
-                pass
 
     def next_page(self) -> bool:
         """跳转到下一页"""
         try:
-            # 查找下一页按钮
-            next_buttons = self.driver.find_elements(By.CSS_SELECTOR, ".cs-pagination-next")
+             # 查找下一页按钮
+            next_link = self.wait.until(
+                EC.element_to_be_clickable((By.LINK_TEXT, "下一页"))
+            )
             
-            if not next_buttons:
+            if not next_link:
                 return False
-                
-            next_btn = next_buttons[0]
             
-            # 检查是否可点击
-            if "disabled" in next_btn.get_attribute("class"):
-                return False
-                
             # 点击下一页
-            next_btn.click()
+            next_link.click()
             time.sleep(2)
             
             return True
