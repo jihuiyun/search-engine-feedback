@@ -8,6 +8,7 @@ from selenium.webdriver.support import expected_conditions as EC
 import time
 import logging
 import sqlite3
+from selenium.webdriver.common.by import By
 
 logger = logging.getLogger(__name__)
 
@@ -48,11 +49,12 @@ class SearchEngine(ABC):
         """跳转到下一页，返回是否存在下一页"""
         pass
 
-    def is_page_expired(self, content: str) -> bool:
+    def is_page_expired(self, content: str = None) -> bool:
+        page_content = content or self.driver.find_element(By.TAG_NAME, "body").text
         """检查页面内容是否符合过期条件"""
         expired_texts = self.config['expired_conditions']['texts']
         # 将页面内容转换为小写以进行不区分大小写的匹配
-        content_lower = content.lower()
+        content_lower = page_content.lower()
         # 使用模糊匹配，不区分大小写
         return any(text.strip().lower() in content_lower for text in expired_texts)
 

@@ -136,7 +136,7 @@ class BaiduEngine(SearchEngine):
             self.wait.until(EC.presence_of_element_located((By.ID, "content_left")))
             
             # 获取所有搜索结果项
-            result_items = self.driver.find_elements(By.CSS_SELECTOR, "div.result.c-container")
+            result_items = self.driver.find_elements(By.CSS_SELECTOR, "div.result.c-container, div.result-op.c-container")
             
             for item in result_items:
                 try:
@@ -191,11 +191,10 @@ class BaiduEngine(SearchEngine):
             self.driver.switch_to.window(self.driver.window_handles[-1])
             
             # 等待页面加载
-            time.sleep(2)
+            time.sleep(1)
             
             # 检查页面内容
-            page_content = self.driver.page_source
-            if self.is_page_expired(page_content):
+            if self.is_page_expired():
                 logger.info("检测到页面包含过期标志")
                 return True
             
@@ -222,14 +221,14 @@ class BaiduEngine(SearchEngine):
             
             # 滚动到页面底部
             self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(2)
+            time.sleep(1)
             
             # 查找并点击页面底部的反馈按钮
             feedback_btn = self.wait.until(
                 EC.element_to_be_clickable((By.CSS_SELECTOR, "a.feedback"))
             )
             feedback_btn.click()
-            time.sleep(2)
+            time.sleep(1)
             
             # 等待反馈弹窗加载
             try:
@@ -271,7 +270,6 @@ class BaiduEngine(SearchEngine):
                         simulateTyping(emailInput, arguments[1]);
                     }
                 """, description, "huiyun@fuyuncn.com")
-                time.sleep(1)
                 
                 # 点击提交按钮
                 submit_btn = self.wait.until(
@@ -284,7 +282,7 @@ class BaiduEngine(SearchEngine):
                 logger.info("请完成安全验证...")
                 try:
                       # 创建一个更长超时时间的 wait 对象
-                    long_wait = WebDriverWait(self.driver, 30)  # 等待最多 30s
+                    long_wait = WebDriverWait(self.driver, 1200)  # 等待最多 30s
                     # 等待验证弹窗消失
                     long_wait.until(
                         EC.invisibility_of_element_located((By.CSS_SELECTOR, "#fb_baidu_list_dialog div.fb-vertify"))
@@ -325,55 +323,55 @@ class BaiduEngine(SearchEngine):
         except (NoSuchElementException, TimeoutException):
             return False
 
-    def process_search_results(self, results: List[Dict[str, Any]]) -> None:
-        """处理搜索结果"""
-        for index, result in enumerate(results, 1):
-            try:
-                logger.info(f"检查第 {index} 条结果: {result['title']}")
-                logger.info(f"URL: {result['url']}")
+    # def process_search_results(self, results: List[Dict[str, Any]]) -> None:
+    #     """处理搜索结果"""
+    #     for index, result in enumerate(results, 1):
+    #         try:
+    #             logger.info(f"检查第 {index} 条结果: {result['title']}")
+    #             logger.info(f"URL: {result['url']}")
                 
-                # 先查询数据库中是否有记录
-                cursor = self.db_conn.cursor()
-                cursor.execute(
-                    "SELECT is_expired FROM results WHERE url = ?", 
-                    (result['url'],)
-                )
-                record = cursor.fetchone()
+    #             # 先查询数据库中是否有记录
+    #             cursor = self.db_conn.cursor()
+    #             cursor.execute(
+    #                 "SELECT is_expired FROM results WHERE url = ?", 
+    #                 (result['url'],)
+    #             )
+    #             record = cursor.fetchone()
                 
-                if record is not None:
-                    # 如果有记录，直接使用数据库中的结果
-                    is_expired = bool(record[0])
-                    logger.info(f"使用数据库记录 - 链接状态: {'已过期' if is_expired else '正常'}")
+    #             if record is not None:
+    #                 # 如果有记录，直接使用数据库中的结果
+    #                 is_expired = bool(record[0])
+    #                 logger.info(f"使用数据库记录 - 链接状态: {'已过期' if is_expired else '正常'}")
                     
-                    if is_expired:
-                        logger.info("跳过已反馈的过期链接")
-                    continue
+    #                 if is_expired:
+    #                     logger.info("跳过已反馈的过期链接")
+    #                 continue
                 
-                # 如果没有记录，则检查链接
-                is_expired = self.check_expired(result['url'])
-                logger.info(f"检查结果: {'已过期' if is_expired else '正常'}")
+    #             # 如果没有记录，则检查链接
+    #             is_expired = self.check_expired(result['url'])
+    #             logger.info(f"检查结果: {'已过期' if is_expired else '正常'}")
                 
-                # 将结果保存到数据库
-                cursor.execute(
-                    """
-                    INSERT INTO results (url, is_expired, check_time, engine)
-                    VALUES (?, ?, datetime('now'), ?)
-                    """,
-                    (result['url'], is_expired, 'baidu')
-                )
-                self.db_conn.commit()
+    #             # 将结果保存到数据库
+    #             cursor.execute(
+    #                 """
+    #                 INSERT INTO results (url, is_expired, check_time, engine)
+    #                 VALUES (?, ?, datetime('now'), ?)
+    #                 """,
+    #                 (result['url'], is_expired, 'baidu')
+    #             )
+    #             self.db_conn.commit()
                 
-                if is_expired:
-                    logger.info(f"发现过期链接，准备提交反馈: {result['url']}")
-                    if self.submit_feedback(result):
-                        logger.info("反馈提交成功")
-                    else:
-                        logger.error("反馈提交失败")
-                        return  # 如果反馈提交失败，停止处理后续结果
+    #             if is_expired:
+    #                 logger.info(f"发现过期链接，准备提交反馈: {result['url']}")
+    #                 if self.submit_feedback(result):
+    #                     logger.info("反馈提交成功")
+    #                 else:
+    #                     logger.error("反馈提交失败")
+    #                     return  # 如果反馈提交失败，停止处理后续结果
                 
-            except Exception as e:
-                logger.error(f"处理搜索结果时出错: {str(e)}")
-                return  # 出错时停止处理后续结果
+    #         except Exception as e:
+    #             logger.error(f"处理搜索结果时出错: {str(e)}")
+    #             return  # 出错时停止处理后续结果
 
     def wait_for_feedback_completion(self):
         """等待反馈提交完成"""

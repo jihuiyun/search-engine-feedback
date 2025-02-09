@@ -26,7 +26,7 @@ class SearchProcessor:
         if 'element' not in result:
             return
         
-        color = '#ff0000' if highlight else 'transparent'
+        color = '#ff977c' if highlight else 'transparent'
         try:
             self.driver.execute_script("""
                 arguments[0].style.backgroundColor = arguments[1];
@@ -58,6 +58,7 @@ class SearchProcessor:
                 return True
                 
             # 检查是否过期
+            logger.info(f"过期检测：{result['title']}")
             is_expired = engine.check_expired(result['url'])
             result['is_expired'] = is_expired
             
@@ -65,7 +66,7 @@ class SearchProcessor:
             if is_expired:
                 if not engine.submit_feedback(result):
                     logger.error("反馈提交失败")
-                    return False
+                    return True
                 
              # 保存结果
             self.db.save_result(result)
