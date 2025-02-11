@@ -13,6 +13,7 @@ from urllib.parse import unquote
 
 logger = logging.getLogger(__name__)
 
+
 class ToutiaoEngine(SearchEngine):
     def __init__(self, config_path: str, browser_manager):
         super().__init__(config_path, browser_manager)
@@ -52,6 +53,7 @@ class ToutiaoEngine(SearchEngine):
     def get_search_results(self) -> List[Dict[str, Any]]:
         """获取搜索结果列表"""
         results = []
+        title_list = []
         try:
             # 等待搜索结果加载
             self.wait.until(
@@ -62,7 +64,7 @@ class ToutiaoEngine(SearchEngine):
             # 获取所有搜索结果项的容器
             result_items = self.driver.find_elements(
                 By.CSS_SELECTOR, 
-                "div.cs-view.pad-bottom-3.cs-view-block.cs-header.align-items-center"
+                "div.cs-view.pad-bottom-3.cs-view-block.cs-header.align-items-center" # html 选择器 
             )
             
             print(f"找到 {len(result_items)} 个结果项")
@@ -109,7 +111,12 @@ class ToutiaoEngine(SearchEngine):
                         'element': item,
                         'feedback_element': feedback_element
                     }
-                    results.append(result)
+
+                    # 元素去重
+                    # if not any(existing['title'] == result['title'] for existing in results):
+                    if result['title'] not in title_list:
+                        results.append(result)
+                        title_list.append(result['title'])
                     
                 except NoSuchElementException as e:
                     print(f"解析搜索结果项时出错: {str(e)}")
