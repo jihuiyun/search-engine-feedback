@@ -172,7 +172,7 @@ class Database:
                         WHERE keyword = ? AND search_engine = ? AND title = ?
                     ''', (keyword, search_engine, title))
                 
-                result = cursor.fetchone()
+                result = cursor.fetchone() # 用于从查询结果中获取一行数据，适用于逐行处理查询结果的场景
                 if result:
                     return {
                         'keyword': result[0],

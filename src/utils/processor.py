@@ -15,9 +15,9 @@ class SearchProcessor:
         with open(config_path, 'r', encoding='utf-8') as f:
             self.config = yaml.safe_load(f)
             
-        self.browser_manager = browser_manager
-        self.driver = browser_manager.driver
-        self.engines = engines
+        self.browser_manager = browser_manager # 浏览器管理器   
+        self.driver = browser_manager.driver # 浏览器驱动
+        self.engines = engines # 搜索引擎
         # 初始化数据库
         self.db = Database(self.config['database']['path'])
 
@@ -90,11 +90,11 @@ class SearchProcessor:
         if not engine.load_cookies_and_login():
             logger.error(f"登录失败: {engine_name}")
             return
-            
+        # 开始正式检索查询    
         try:
             engine.search(keyword)
             while True:
-                results = engine.get_search_results()
+                results = engine.get_search_results() # 保存当前页检索条目
                 
                 if not results:
                     logger.info(f"搜索完成: {engine_name} - {keyword}")

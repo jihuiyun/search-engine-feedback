@@ -182,13 +182,13 @@ class BaiduEngine(SearchEngine):
         if not self.ensure_browser():
             return False
             
-        current_window = self.driver.current_window_handle
+        current_window = self.driver.current_window_handle # 保存了原始窗口的句柄，以便在完成新窗口的操作后可以返回到原始窗口
         
         try:
             # 新标签页打开链接
             self.driver.execute_script(f"window.open('{url}', '_blank');")
             time.sleep(1)
-            self.driver.switch_to.window(self.driver.window_handles[-1])
+            self.driver.switch_to.window(self.driver.window_handles[-1]) # 主要作用是让 Selenium 切换到最后打开的窗口或标签页，以便您可以在该窗口中执行后续操作
             
             # 等待页面加载
             time.sleep(1)
@@ -199,6 +199,7 @@ class BaiduEngine(SearchEngine):
                 return True
             
             # 检查重定向
+
             if self.wait_for_redirect(self.config['expired_conditions']['redirect_timeout']):
                 logger.info("检测到页面发生重定向")
                 return True
@@ -208,7 +209,7 @@ class BaiduEngine(SearchEngine):
             
         finally:
             self.driver.close()
-            self.driver.switch_to.window(current_window)
+            self.driver.switch_to.window(current_window) # 返回原来的窗口
             time.sleep(1)
 
     def submit_feedback(self, result: Dict[str, Any]) -> bool:
@@ -229,14 +230,20 @@ class BaiduEngine(SearchEngine):
             )
             feedback_btn.click()
             time.sleep(1)
-            
+
             # 等待反馈弹窗加载
             try:
+                # 找到反馈元素点击定位块
+                element_block = result['element'].find_element(By.CSS_SELECTOR, "div.fb-list-container")  # 替换为实际的选择器
+
+                self.driver.execute_script("arguments[0].scrollIntoView();", element_block)
+                self.driver.execute_script("arguments[0].click();", element_block);
+
                 # 等待弹窗完全加载
                 self.wait.until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, "#fb_baidu_list_dialog"))
                 )
-                
+
                 # 填写反馈描述
                 description = (
                     "网页打不开，提示内容已删除或找不到该网页，请删除快照，且快照包含91y关键词信息为不实内容，"
@@ -271,12 +278,13 @@ class BaiduEngine(SearchEngine):
                     }
                 """, description, "huiyun@fuyuncn.com")
                 
+                time.sleep(1)
+
                 # 点击提交按钮
                 submit_btn = self.wait.until(
                     EC.element_to_be_clickable((By.CSS_SELECTOR, "#fb_list_post_save"))
                 )
                 submit_btn.click()
-                time.sleep(1)
                 
                 # 等待用户完成安全验证
                 logger.info("请完成安全验证...")
