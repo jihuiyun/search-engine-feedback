@@ -93,6 +93,8 @@ class SearchProcessor:
         # 开始正式检索查询    
         try:
             engine.search(keyword)
+            current_page = 1  # 初始化当前页码
+            
             while True:
                 results = engine.get_search_results() # 保存当前页检索条目
                 
@@ -115,7 +117,13 @@ class SearchProcessor:
                     logger.info(f"已到最后一页: {engine_name} - {keyword}")
                     self.db.save_progress(keyword, engine_name, is_done=True)
                     break
-                    
+                current_page += 1  # 更新当前页码
+            
+                if current_page > 35:  # 如果当前页码超过4，停止处理
+                    logger.info(f"已处理到第 {current_page} 页，停止处理关键词: {keyword}")
+                    self.db.save_progress(keyword, engine_name, is_done=True)
+                    break
+                
                 time.sleep(1)  # 翻页后等待加载
                 
         except Exception as e:
