@@ -120,8 +120,17 @@ class BingEngine(SearchEngine):
                 for item in result_items:
                     try:
                         title_element = item.find_element(By.TAG_NAME, "h2").find_element(By.TAG_NAME, "a")
+                        
+                        # 获取标题
+                        title = title_element.text.strip()
+                        
+                        # 检查标题是否重复
+                        if any(r['title'] == title for r in results):
+                            logger.debug(f"跳过重复标题: {title}")
+                            continue
+                        
                         result = {
-                            'title': title_element.text.strip(),
+                            'title': title,
                             'url': title_element.get_attribute('href'),
                             'element': item
                         }

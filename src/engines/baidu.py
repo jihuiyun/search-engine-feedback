@@ -153,7 +153,13 @@ class BaiduEngine(SearchEngine):
                     if not title_element:
                         continue
 
+                    # 获取标题
                     title = title_element.text.strip()
+                    
+                    # 检查标题是否重复
+                    if any(r['title'] == title for r in results):
+                        logger.debug(f"跳过重复标题: {title}")
+                        continue
 
                     # 从父级 div 的 mu 属性获取真实 URL
                     url = item.get_attribute('mu') or title_element.get_attribute('href')
