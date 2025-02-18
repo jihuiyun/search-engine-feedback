@@ -269,6 +269,50 @@ class BingEngine(SearchEngine):
             logger.info("已点击提交按钮")
 
             time.sleep(2)  # 等待提交完成
+            
+            # 检查是否出现超过限额提示 你已超过每日提交
+            if "你已超过每日提交" in self.driver.page_source:
+                logger.warning("检测到反馈次数超过限额，需要更换账号")
+                
+                # 跳转到登录页面
+                self.driver.get("https://www.bing.com/toolbox/intermediatelogin/")
+                logger.info("请使用新账号登录...")
+                
+                # 等待用户完成登录（等待直到页面URL不是任何一个登录页面）
+                while True:
+                    current_url = self.driver.current_url
+                    if not any(current_url.startswith(url) for url in login_urls):
+                        break
+                    time.sleep(1)
+                
+                logger.info("新账号登录完成")
+                
+                # 保存新的登录 cookies
+                self.browser_manager.save_cookies('bing.com')
+                time.sleep(2)
+                
+                # 重新访问反馈页面
+                self.driver.get(feedback_url)
+                time.sleep(2)
+                
+                # 重新填写反馈表单
+                url_input = self.wait.until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "input[placeholder='输入 URL 或粘贴复制的 URL']"))
+                )
+                url_input.clear()
+                url_input.send_keys(result['url'])
+                
+                delete_page_radio = self.wait.until(
+                    EC.element_to_be_clickable((By.CSS_SELECTOR, "input[name='ChoiceGroup11']+label"))
+                )
+                delete_page_radio.click()
+                
+                # 重新点击提交
+                submit_btn = self.wait.until(
+                    EC.element_to_be_clickable((By.XPATH, "//*[text()='提交']"))
+                )
+                self.driver.execute_script("arguments[0].click();", submit_btn)
+                time.sleep(2)
 
         except Exception as e:
             logger.error(f"提交反馈失败: {str(e)}")
