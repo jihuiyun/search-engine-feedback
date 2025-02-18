@@ -193,17 +193,119 @@ class BingEngine(SearchEngine):
                 self.ensure_browser()
 
     def submit_feedback(self, result: Dict[str, Any]) -> bool:
-        if self.daily_feedback_count >= self.max_daily_feedback:
-            logger.warning("今日反馈次数已达上限，请更换账号")
-            input("请更换账号并登录后按回车继续...")
-            self.daily_feedback_count = 0
-            self.cookies_loaded = False
-            
-        success = super().submit_feedback(result)
-        if success:
-            self.daily_feedback_count += 1
-        return success
+        """提交反馈"""
+        # 保存当前窗口句柄
+        current_window = self.driver.current_window_handle
 
+        try:
+            # 新开标签页
+            self.driver.execute_script("window.open('');")
+            self.driver.switch_to.window(self.driver.window_handles[-1])
+
+            # 打开反馈页面
+            feedback_url = self.engine_config['feedback_url']
+            self.driver.get(feedback_url)
+            time.sleep(2)
+
+            # 检查是否需要登录 - 支持多个登录页面
+            login_urls = [
+                "https://www.bing.com/toolbox/intermediatelogin/",
+                "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+                "https://login.live.com/"
+            ]
+
+            # 检查当前URL是否是登录页面
+            is_login_page = any(self.driver.current_url.startswith(url) for url in login_urls)
+            if is_login_page:
+                # 先尝试加载本地 cookie
+                if self.browser_manager.load_cookies('bing.com'):
+                    logger.info("已加载本地 cookie，刷新页面...")
+                    self.driver.get(feedback_url)
+                    time.sleep(2)
+
+                    # 再次检查是否还需要登录
+                    is_login_page = any(self.driver.current_url.startswith(url) for url in login_urls)
+                    if not is_login_page:
+                        logger.info("使用本地 cookie 登录成功")
+                    else:
+                        logger.info("本地 cookie 已失效，需要手动登录...")
+
+                # 如果仍然需要登录，等待用户手动登录
+                if is_login_page:
+                    logger.info("检测到需要登录，等待手动登录...")
+                    # 等待用户手动登录完成，通过检查URL变化来判断
+                    while any(self.driver.current_url.startswith(url) for url in login_urls):
+                        time.sleep(1)
+                    logger.info("登录完成，继续提交反馈")
+                    # 保存新的登录 cookies
+                    self.browser_manager.save_cookies('bing.com')
+                    time.sleep(2)
+
+            # 确保在反馈页面
+            if not self.driver.current_url.startswith(feedback_url):
+                logger.info("重新导航到反馈页面")
+                self.driver.get(feedback_url)
+
+            # 等待并填写内容URL输入框
+            url_input = self.wait.until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "input[placeholder='输入 URL 或粘贴复制的 URL']"))
+            )
+            url_input.clear()
+            url_input.send_keys(result['url'])
+            logger.info(f"已填写URL: {result['url']}")
+
+            # 选择"删除页面"选项
+            delete_page_radio = self.wait.until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, "input[name='ChoiceGroup11']+label"))
+            )
+            delete_page_radio.click()
+            logger.info("已选择'删除页面'选项")
+
+            # 点击提交按钮 - 使用中文文本定位
+            submit_btn = self.wait.until(
+                EC.element_to_be_clickable((By.XPATH, "//*[text()='提交']"))
+            )
+            self.driver.execute_script("arguments[0].click();", submit_btn)  # 使用 JavaScript 点击
+            logger.info("已点击提交按钮")
+
+            time.sleep(2)  # 等待提交完成
+
+        except Exception as e:
+            logger.error(f"提交反馈失败: {str(e)}")
+            # 保存错误截图和页面源码
+            try:
+                timestamp = int(time.time())
+                error_prefix = f"bing_feedback_error_{timestamp}"
+
+                # 保存截图
+                screenshot_path = os.path.join(
+                    self.browser_manager.error_logs_dir,
+                    f"{error_prefix}.png"
+                )
+                self.driver.save_screenshot(screenshot_path)
+                logger.error(f"错误截图已保存到: {screenshot_path}")
+
+                # 保存页面源码
+                html_path = os.path.join(
+                    self.browser_manager.error_logs_dir,
+                    f"{error_prefix}.html"
+                )
+                with open(html_path, 'w', encoding='utf-8') as f:
+                    f.write(self.driver.page_source)
+                logger.error(f"页面源码已保存到: {html_path}")
+            except:
+                pass
+            return False
+        finally:
+            # 关闭反馈标签页，切回搜索结果页
+            try:
+                self.driver.close()
+                self.driver.switch_to.window(current_window)
+            except Exception as e:
+                logger.error(f"切回原窗口失败: {str(e)}")
+                # 如果切回失败，尝试重新初始化浏览器
+                self.ensure_browser()
+        return True
     def next_page(self) -> bool:
         """跳转到下一页"""
         try:
