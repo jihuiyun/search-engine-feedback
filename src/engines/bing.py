@@ -163,8 +163,7 @@ class BingEngine(SearchEngine):
             
             try:
                 time.sleep(2)
-                page_content = self.driver.page_source
-                if self.is_page_expired(page_content):
+                if self.is_page_expired():
                     logger.info("检查结果: 页面包含过期标志")
                     return True
                 
@@ -271,7 +270,7 @@ class BingEngine(SearchEngine):
             time.sleep(2)  # 等待提交完成
             
             # 检查是否出现超过限额提示 你已超过每日提交
-            if "你已超过每日提交" in self.driver.page_source:
+            if "你已超过每日提交" in self.driver.find_element(By.TAG_NAME, "body").text:
                 logger.warning("检测到反馈次数超过限额，需要更换账号")
                 
                 # 跳转到登录页面

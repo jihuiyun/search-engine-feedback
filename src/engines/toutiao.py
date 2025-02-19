@@ -151,8 +151,7 @@ class ToutiaoEngine(SearchEngine):
             time.sleep(2)
             
             # 先检查页面内容是否包含过期标志
-            page_content = self.driver.page_source
-            if self.is_page_expired(page_content):
+            if self.is_page_expired():
                 logger.info("检测到页面包含过期标志")
                 return True
             

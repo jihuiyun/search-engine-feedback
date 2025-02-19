@@ -100,8 +100,7 @@ class So360Engine(SearchEngine):
             time.sleep(2)
             
             # 检查页面内容
-            page_content = self.driver.page_source
-            if self.is_page_expired(page_content):
+            if self.is_page_expired():
                 logger.info("检测到页面包含过期标志")
                 return True
             
