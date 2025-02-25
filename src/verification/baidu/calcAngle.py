@@ -1,23 +1,8 @@
 import time
-from rotate_image_classifier import *
+from rotate_image_classifier.inference import *
 
-class CalcAngle: 
-    def __init__(self) -> None:
-        pass
 
-    def get_img_file(self):
-        """
-        获取旋转验证码图片
-        """
-        img_url = self.style_content['data']['captchalist'][0]['source']['back']['path']
-        print('获取到的图片链接', img_url)
-        response = requests.get(img_url, headers=self.base_headers)
-        with open('img_file/demo_aqc.png', 'wb') as f:
-            f.write(response.content)
-        
-        time.sleep(1)
-
-        predicted_angle= get_result('img_file/demo_aqc.png')
-        # results, avg_diff = get_result('img_file')
-        # predicted_angle = results[0]['Infer']
-        return predicted_angle
+    
+if __name__ == "__main__":
+    angle = getAngle("https://passport.baidu.com/viewlog/img?id=7492-aUISPSKUHFG7VudwhfoFcL%2FJLwauF4qwE%2FG1YXXZl0r7PFrmm7DTapQL75Fvl93Oa3JDdEQEmTs4LsaI%2Fg%2BptHyOf25o1kPJN8MTXJ7yhlf4b6Sy7uMk%2F%2BkL5fd8tgB6xORq3a6DNfuH6IflMpsLHCstMXGt9NI6rmnX8GZyaf%2Bxx062H9gVbyLGXQtLvsQym%2FCel4d2cThyKRYwTd2V4VHPQDGzr8pBu%2ForsyvHEfVk6%2F%2BXFOS%2BGNZKn4B6EYbj6o%2Ft9wQZS6YaWNplHk6DrrN9vZuBIiiAGg4U3WWDhNWoBigfvHIf3Phn4q1tlOyhLoUNDBQmCN5X4mTm6Llwe%2B7FjhQRonWynFHA6IJ%2BR3w%3D&ak=dabac7bfca28a1c17b092fc071d0f56c&tk=4098vwlUa4N2BnwBRAX3mschpWlGzkGz3Ex4T%2BRl5gHobsqS1SHeBcBceug2jtohuk5fdvcM0Iblr1VmdFpvMeWTkF7VthyLgyCYC01B3LeJ1CTQOiyJwkrwliDPZWPIrQiR")
+    print(angle)
