@@ -1,0 +1,8 @@
+import time
+from rotate_image_classifier.inference import *
+
+
+    
+if __name__ == "__main__":
+    angle = getAngle("https://passport.baidu.com/viewlog/img?id=7492-aUISPSKUHFG7VudwhfoFcL%2FJLwauF4qwE%2FG1YXXZl0r7PFrmm7DTapQL75Fvl93Oa3JDdEQEmTs4LsaI%2Fg%2BptHyOf25o1kPJN8MTXJ7yhlf4b6Sy7uMk%2F%2BkL5fd8tgB6xORq3a6DNfuH6IflMpsLHCstMXGt9NI6rmnX8GZyaf%2Bxx062H9gVbyLGXQtLvsQym%2FCel4d2cThyKRYwTd2V4VHPQDGzr8pBu%2ForsyvHEfVk6%2F%2BXFOS%2BGNZKn4B6EYbj6o%2Ft9wQZS6YaWNplHk6DrrN9vZuBIiiAGg4U3WWDhNWoBigfvHIf3Phn4q1tlOyhLoUNDBQmCN5X4mTm6Llwe%2B7FjhQRonWynFHA6IJ%2BR3w%3D&ak=dabac7bfca28a1c17b092fc071d0f56c&tk=4098vwlUa4N2BnwBRAX3mschpWlGzkGz3Ex4T%2BRl5gHobsqS1SHeBcBceug2jtohuk5fdvcM0Iblr1VmdFpvMeWTkF7VthyLgyCYC01B3LeJ1CTQOiyJwkrwliDPZWPIrQiR")
+    print(angle)

@@ -148,3 +148,11 @@
 
 - 必应：huiyun@fuyuncn.com fuyuncn.123
 - 百度：1355526214@qq.com jihuiyun.123
+
+# 百度旋转验证码实现资料
+1. 【CSDN x】https://blog.csdn.net/wh00011/article/details/140658471
+2. 【GitHub x】https://github.com/wangh00/aqc_spin_v2
+3. 【旋转模型✅】https://github.com/HarderThenHarder/rotate_image_classifier
+4. 【思路-另外一种语言 -> python】https://www.zhihu.com/zvideo/1512197159978483712
+5. 【模型实现原理】https://github.com/d4nst/RotNet
+6. 【卷积神经网络实现】https://d4nst.github.io/2017/01/12/image-orientation/
