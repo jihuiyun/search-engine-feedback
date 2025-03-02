@@ -40,7 +40,7 @@ class SearchEngine(ABC):
         pass
 
     @abstractmethod
-    def submit_feedback(self, result: Dict[str, Any]) -> None:
+    def submit_feedback(self, result: Dict[str, Any]) -> bool:
         """提交反馈"""
         pass
 

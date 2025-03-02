@@ -12,6 +12,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 import urllib3
 import sqlite3
 from selenium.webdriver.common.action_chains import ActionChains
+# 导入百度旋转验证码求解器
+from src.verification.baidu.baidu_rotate_captcha_solver import solve_rotation_captcha
 
 # 设置 urllib3 的日志级别为 ERROR，隐藏连接警告
 urllib3.disable_warnings()
@@ -284,19 +286,22 @@ class BaiduEngine(SearchEngine):
                     }
                 """, description, "huiyun@fuyuncn.com")
                 
-                time.sleep(1)
-
                 # 点击提交按钮
                 submit_btn = self.wait.until(
                     EC.element_to_be_clickable((By.CSS_SELECTOR, "#fb_list_post_save"))
                 )
                 submit_btn.click()
-                
+                time.sleep(1)
                 # 等待用户完成安全验证
-                logger.info("请完成安全验证...")
+                logger.info("准备完成安全验证...")
                 try:
-                      # 创建一个更长超时时间的 wait 对象
-                    long_wait = WebDriverWait(self.driver, 1200)  # 等待最多 30s
+                    if self.check_verification():
+                        if not self.wait_for_verification():
+                            logger.error("验证码处理失败")
+                            return False
+                        
+                    # 创建一个更长超时时间的 wait 对象
+                    long_wait = WebDriverWait(self.driver, 1200)  
                     # 等待验证弹窗消失
                     long_wait.until(
                         EC.invisibility_of_element_located((By.CSS_SELECTOR, "#fb_baidu_list_dialog div.fb-vertify"))
@@ -398,28 +403,65 @@ class BaiduEngine(SearchEngine):
     def check_verification(self) -> bool:
         """检查是否需要验证码"""
         try:
+            # 直接查找包含"请完成下方验证后继续操作"文本的元素
+            verification_elements = self.driver.find_elements(
+                By.XPATH, 
+                "//*[contains(text(), '请完成下方验证后继续操作')]"
+            )
+            
+            if verification_elements and len(verification_elements) > 0:
+                logger.info("检测到需要验证码：找到'请完成下方验证后继续操作'文本")
+                return True
+            
+            # 保留原有的检测方法作为备选
             verify_dialog = self.driver.find_elements(
                 By.CSS_SELECTOR, 
                 'div.passMod_dialog-container'
             )
             if verify_dialog and verify_dialog[0].is_displayed():
-                logger.info("检测到需要验证码")
+                logger.info("通过备选方法检测到需要验证码")
                 return True
+                
             return False
         except Exception as e:
             logger.error(f"检查验证码状态出错: {str(e)}")
             return False
 
     def wait_for_verification(self) -> bool:
-        """等待用户完成验证码"""
+        """等待完成验证码，优先使用自动处理，失败则等待用户手动完成"""
         try:
-            logger.info("等待用户完成验证码...")
+            logger.info("检测到验证码，尝试自动处理...")
+            
+            # 检查是否是旋转验证码
+            spin_img = self.driver.find_elements(By.CSS_SELECTOR, "img.vcode-spin-img")
+            if spin_img and len(spin_img) > 0:
+                logger.info("检测到旋转验证码，启动自动求解...")
+                result = solve_rotation_captcha(self.driver)
+                if result:
+                    logger.info("旋转验证码自动处理成功")
+                    return True
+                else:
+                    logger.warning("旋转验证码自动处理失败，请手动完成验证...")
+            else:
+                logger.info("未检测到可自动处理的验证码类型，等待手动处理...")
+            
+            # 如果自动处理失败或不是已知的验证码类型，等待用户手动处理
+            max_wait_time = 120  # 最长等待2分钟
+            start_time = time.time()
+            
             while self.check_verification():
+                elapsed_time = time.time() - start_time
+                if elapsed_time > max_wait_time:
+                    logger.error(f"等待验证码完成超时（{max_wait_time}秒）")
+                    return False
+                    
                 time.sleep(2)
                 if not self.ensure_browser():
                     return False
+                    
             logger.info("验证码已完成")
             return True
+            
         except Exception as e:
             logger.error(f"等待验证码完成出错: {str(e)}")
             return False 

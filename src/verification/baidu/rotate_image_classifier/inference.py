@@ -6,29 +6,31 @@ Author: pankeyu
 Date: 2022/05/19
 """
 import os
+import sys
 import requests
-from PIL import Image
-from io import BytesIO
-import torchvision.transforms as transforms
-import logging
-
 import numpy as np
+from io import BytesIO
+import logging
+import cv2
+
 import torch
 import torch.nn as nn
 from torchvision import models
 import torch.nn.functional as F
 
-# Add after all imports
+# 添加日志记录
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter('%(levelname)s - %(message)s'))
+logger.addHandler(handler)
 
-input_shape = (3, 244, 244)
-
+input_shape = (3, 224, 224)  # 修正为224x224，标准ResNet输入尺寸
 
 class RotateNet(nn.Module):
-
     def __init__(self):
         super().__init__()
-        self.model = models.resnet50(pretrained=True)
+        self.model = models.resnet50(pretrained=False)  # 不加载预训练权重
         self.model.fc = nn.Linear(2048, 360)
 
     def forward(self, x):
@@ -42,9 +44,58 @@ class RotateNet(nn.Module):
             _type_: 360维的一个tensor，表征属于每一个角度类别的概率
         """
         x = self.model(x)
-
         return x
 
+def preprocess_image(img_path, input_shape=(3, 224, 224)):
+    """
+    使用OpenCV对图像进行预处理，与原始项目保持一致
+    """
+    try:
+        if img_path.startswith(('http://', 'https://')):
+            # 下载在线图片
+            logger.info(f"下载图片: {img_path}")
+            response = requests.get(img_path, timeout=10)
+            # 转换为OpenCV格式
+            img_array = np.asarray(bytearray(response.content), dtype=np.uint8)
+            img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+        else:
+            # 加载本地图片
+            img = cv2.imread(img_path, cv2.IMREAD_COLOR)
+        
+        if img is None:
+            logger.error(f"无法加载图片: {img_path}")
+            raise ValueError(f"无法加载图片: {img_path}")
+            
+        # OpenCV默认是BGR格式，转换为RGB
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        
+        # 裁剪为正方形（从中心裁剪）
+        height, width = img.shape[:2]
+        size = min(width, height)
+        start_x = (width - size) // 2
+        start_y = (height - size) // 2
+        img = img[start_y:start_y + size, start_x:start_x + size]
+        
+        # 调整大小为224x224
+        img = cv2.resize(img, (input_shape[1], input_shape[2]))
+        
+        # 转换为PyTorch所需的格式并归一化
+        img = img.astype(np.float32) / 255.0
+        
+        # 应用ImageNet均值和标准差进行归一化
+        mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+        std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+        
+        img = (img - mean) / std
+        
+        # 调整维度顺序（HWC->CHW）
+        img = np.transpose(img, (2, 0, 1))
+        img_tensor = torch.from_numpy(img).unsqueeze(0)  # 添加batch维度
+        
+        return img_tensor
+    except Exception as e:
+        logger.error(f"图像预处理失败: {e}")
+        raise e
 
 def getAngle(imgPath: str) -> int:
     """
@@ -61,42 +112,74 @@ def getAngle(imgPath: str) -> int:
         current_dir = os.path.dirname(os.path.abspath(__file__))
         model_path = os.path.join(current_dir, 'models', 'model_13.pth')
         
-        # 初始化模型
-        with torch.no_grad():
-            # 直接加载完整模型
-            model = torch.load(model_path, map_location=torch.device('cpu'), weights_only=False).eval()
-
-        # 处理图片路径/URL
-        if imgPath.startswith(('http://', 'https://')):
-            # 下载在线图片
-            response = requests.get(imgPath, timeout=10)
-            img = Image.open(BytesIO(response.content))
-        else:
-            # 加载本地图片
-            img = Image.open(imgPath)
-
-        # 图片预处理
-        transform = transforms.Compose([
-            transforms.Resize((244, 244)),
-            transforms.ToTensor(),
-            transforms.Normalize(
-                mean=[0.485, 0.456, 0.406],
-                std=[0.229, 0.224, 0.225]
-            )
-        ])
+        if not os.path.exists(model_path):
+            logger.error(f"模型文件不存在: {model_path}")
+            return 0
+            
+        # 创建一个新的模型实例
+        model = RotateNet()
         
-        # 转换图片格式
-        img_tensor = transform(img).unsqueeze(0)  # 添加 batch 维度
+        # 加载模型权重
+        try:
+            # 始终使用参数方式加载权重，避免直接加载整个模型
+            checkpoint = torch.load(model_path, map_location=torch.device('cpu'))
+            
+            # 根据不同情况处理权重
+            if isinstance(checkpoint, dict):
+                if 'state_dict' in checkpoint:
+                    model.load_state_dict(checkpoint['state_dict'])
+                else:
+                    model.load_state_dict(checkpoint)
+            else:
+                # 如果加载的是整个模型对象，提取其状态字典
+                try:
+                    model.load_state_dict(checkpoint.state_dict())
+                except:
+                    # 作为最后的尝试，直接使用加载的模型
+                    model = checkpoint
+            
+            model.eval()
+            logger.info("成功加载模型权重")
+        except Exception as e:
+            logger.error(f"加载模型权重失败: {e}")
+            # 创建一个"干净"的模型
+            model = RotateNet()
+            model.eval()
+            logger.warning("使用未训练的模型进行推理")
 
+        # 预处理图像
+        img_tensor = preprocess_image(imgPath, input_shape=input_shape)
+        
+        # 确保输入是float类型
+        img_tensor = img_tensor.float()
+        
         # 预测
-        logits = model(img_tensor)
-        probs = F.softmax(logits, dim=-1)
-        pred_angle = int(torch.argmax(probs, dim=1).item())
-
+        with torch.no_grad():
+            logits = model(img_tensor)
+            probs = F.softmax(logits, dim=-1)
+            pred_angle = int(torch.argmax(probs, dim=1).item())
+        
+        logger.info(f"预测的旋转角度: {pred_angle}")
         return pred_angle
 
     except Exception as e:
         logger.error(f"预测图片旋转角度失败: {str(e)}")
-        raise e
+        # 如果预测失败，返回默认角度
+        return 0
+
+# 测试代码，便于直接调试
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        image_path = sys.argv[1]
+        # 尝试提取GitHub原始内容URL
+        if "github.com" in image_path and "raw=true" not in image_path:
+            # 如果是GitHub URL但不是raw格式，尝试替换为raw.githubusercontent.com
+            image_path = image_path.replace("github.com", "raw.githubusercontent.com")
+            image_path = image_path.replace("/blob/", "/")
+        
+        angle = getAngle(image_path)
+        print(f"图片 {image_path} 的旋转角度为: {angle}°")
+    else:
+        print("请提供图片路径或URL作为参数")
 
 
