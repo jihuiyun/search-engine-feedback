@@ -6,7 +6,7 @@ from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-def solve_rotation_captcha(driver, max_retries=20):
+def solve_rotation_captcha(driver, max_retries=30):
     """
     解决百度旋转验证码，如果失败会自动重试
     
