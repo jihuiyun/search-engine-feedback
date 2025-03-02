@@ -1,5 +1,5 @@
 .history
-error_logs
+error_logs/
 .idea
 .DS_Store
 
