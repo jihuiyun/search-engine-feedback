@@ -27,8 +27,8 @@ def solve_rotation_captcha(driver, max_retries=30):
             # 检查验证码是否还存在
             try:
                 # 使用短超时等待验证码文本元素
-                verification_text = WebDriverWait(driver, 2).until(
-                    EC.presence_of_element_located((By.XPATH, "//*[contains(text(), '拖动左侧滑块使图片为正')]"))
+                verification_text = WebDriverWait(driver, 4).until(
+                    EC.presence_of_element_located((By.XPATH, "//*[contains(text(), '请完成下方验证后继续操作')]"))
                 )
                 
                 # 如果验证码文本不可见，说明已经验证成功
@@ -85,7 +85,7 @@ def solve_rotation_captcha(driver, max_retries=30):
             
             # 检查验证是否成功（验证码文本消失）
             try:
-                verification_text = driver.find_element(By.XPATH, "//*[contains(text(), '拖动左侧滑块使图片为正')]")
+                verification_text = driver.find_element(By.XPATH, "//*[contains(text(), '请完成下方验证后继续操作')]")
                 if not verification_text.is_displayed():
                     print("验证成功，验证码已消失")
                     return True
