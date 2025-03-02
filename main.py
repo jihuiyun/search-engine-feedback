@@ -1,5 +1,11 @@
 import logging
 import os
+import warnings
+import platform
+
+# 在导入urllib3之前隐藏特定警告
+warnings.filterwarnings("ignore", category=Warning, module="urllib3")
+
 from src.utils.browser_manager import BrowserManager
 from src.utils.processor import SearchProcessor
 from src.engines.toutiao import ToutiaoEngine
@@ -8,7 +14,6 @@ from src.engines.baidu import BaiduEngine
 from src.engines.so360 import So360Engine
 import urllib3
 from selenium.webdriver.remote.remote_connection import LOGGER as selenium_logger
-import platform
 
 # 配置日志
 logging.basicConfig(
