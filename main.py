@@ -34,6 +34,13 @@ logger = logging.getLogger(__name__)
 def main():
     logger.info("程序启动: 初始化系统配置...")
     
+    # 设置环境变量
+    os.environ['WDM_DISABLE_USAGE_STATS'] = 'true'
+    os.environ['WDM_SSL_VERIFY'] = '0'
+    os.environ['WDM_PRINT_FIRST_LINE'] = 'False'
+    os.environ['WDM_LOCAL_PATH'] = './drivers'
+    os.environ['WDM_LOG_LEVEL'] = '0'  # 减少日志输出
+    
     # 设置 ChromeDriver
     try:
         chromedriver_path = setup_chromedriver()
@@ -42,14 +49,6 @@ def main():
         logger.error(f"ChromeDriver 设置失败: {str(e)}")
         return
 
-    # 设置环境变量
-    os.environ['WDM_DISABLE_USAGE_STATS'] = 'true'
-    os.environ['WDM_SSL_VERIFY'] = '0'
-    os.environ['WDM_PRINT_FIRST_LINE'] = 'False'
-    os.environ['WDM_LOCAL_PATH'] = './drivers'
-    os.environ['WDM_ARCHITECTURE'] = 'arm64' if platform.processor().startswith('arm') else 'x64'
-    os.environ['WDM_LOG_LEVEL'] = '0'  # 减少日志输出
-    
     browser_manager = BrowserManager()
     config_path = "config.yaml"
     

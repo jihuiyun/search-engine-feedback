@@ -6,6 +6,8 @@ from selenium.common.exceptions import WebDriverException
 import json
 import os
 import time
+import ssl
+import certifi
 from webdriver_manager.chrome import ChromeDriverManager
 import platform
 import shutil
@@ -90,12 +92,23 @@ class BrowserManager:
             
             # 下载对应版本的 ChromeDriver
             # 构造下载 URL (使用 Chrome for Testing)
-            download_url = f"https://storage.googleapis.com/chrome-for-testing-public/{chrome_version}/mac-arm64/chromedriver-mac-arm64.zip"
+            os_type = platform.system().lower()
+            is_arm = platform.machine().lower().startswith(('arm', 'aarch'))
+            arch = 'arm64' if is_arm else 'x64'
+            
+            download_url = f"https://storage.googleapis.com/chrome-for-testing-public/{chrome_version}/mac-{arch}/chromedriver-mac-{arch}.zip"
             zip_path = os.path.join(drivers_dir, 'chromedriver.zip')
             driver_path = os.path.join(drivers_dir, 'chromedriver')
             
+            # 创建自定义的 SSL 上下文
+            ssl_context = ssl.create_default_context(cafile=certifi.where())
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            
             # 下载文件
             logger.info(f"下载 ChromeDriver: {download_url}")
+            opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=ssl_context))
+            urllib.request.install_opener(opener)
             urllib.request.urlretrieve(download_url, zip_path)
             
             # 解压文件
@@ -103,7 +116,7 @@ class BrowserManager:
                 zip_ref.extractall(drivers_dir)
             
             # 移动 chromedriver 到正确位置
-            extracted_driver = os.path.join(drivers_dir, 'chromedriver-mac-arm64', 'chromedriver')
+            extracted_driver = os.path.join(drivers_dir, f'chromedriver-mac-{arch}', 'chromedriver')
             if os.path.exists(driver_path):
                 os.remove(driver_path)
             shutil.move(extracted_driver, driver_path)
@@ -113,7 +126,7 @@ class BrowserManager:
             
             # 清理临时文件
             os.remove(zip_path)
-            shutil.rmtree(os.path.join(drivers_dir, 'chromedriver-mac-arm64'))
+            shutil.rmtree(os.path.join(drivers_dir, f'chromedriver-mac-{arch}'))
             
             # 使用下载的驱动
             service = Service(driver_path)
