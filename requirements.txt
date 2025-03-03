@@ -1,8 +1,9 @@
 selenium==4.18.1
 webdriver-manager==4.0.1
 PyYAML==6.0.1 
-requests 
-Pillow 
-torch==2.6.0
-torchvision
-opencv-python
+requests==2.31.0
+Pillow==10.2.0
+numpy==1.24.3
+torch==2.2.0
+torchvision==0.17.0
+opencv-python==4.9.0.80

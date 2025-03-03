@@ -18,7 +18,6 @@ import torch
 import torch.nn as nn
 from torchvision import models
 import torch.nn.functional as F
-from torch.serialization import add_safe_globals
 
 # 添加日志记录
 logger = logging.getLogger(__name__)
@@ -135,10 +134,7 @@ def getAngle(imgPath: str) -> int:
         
         # 加载模型权重
         try:
-            # 将RotateNet类添加到安全的全局变量中
-            add_safe_globals([RotateNet])
-            
-            # 尝试使用自定义加载函数处理模块重定向问题
+            # 使用自定义加载函数处理模块重定向问题
             with open(model_path, 'rb') as f:
                 checkpoint = custom_load(f)
             
@@ -159,14 +155,14 @@ def getAngle(imgPath: str) -> int:
             model.eval()
             logger.info("成功使用自定义加载函数加载模型权重")
         except Exception as e:
-            # 如果自定义加载函数失败，尝试使用weights_only=False加载
+            # 如果自定义加载函数失败，尝试使用torch.load加载
             logger.warning(f"自定义加载函数失败，尝试其他方法: {e}")
             try:
                 # 设置模块重定向
                 sys.modules['__main__'] = sys.modules[__name__]
                 
-                # 使用weights_only=False加载
-                checkpoint = torch.load(model_path, map_location=torch.device('cpu'), weights_only=False)
+                # 使用torch.load加载
+                checkpoint = torch.load(model_path, map_location=torch.device('cpu'))
                 
                 if isinstance(checkpoint, dict):
                     if 'state_dict' in checkpoint:

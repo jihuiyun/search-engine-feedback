@@ -156,3 +156,5 @@
 4. 【思路-另外一种语言 -> python】https://www.zhihu.com/zvideo/1512197159978483712
 5. 【模型实现原理】https://github.com/d4nst/RotNet
 6. 【卷积神经网络实现】https://d4nst.github.io/2017/01/12/image-orientation/
+
+安装依赖：pip3 install -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
