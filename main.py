@@ -14,6 +14,7 @@ from src.engines.baidu import BaiduEngine
 from src.engines.so360 import So360Engine
 import urllib3
 from selenium.webdriver.remote.remote_connection import LOGGER as selenium_logger
+from utils.setup_chromedriver import setup_chromedriver
 
 # 配置日志
 logging.basicConfig(
@@ -32,6 +33,15 @@ logger = logging.getLogger(__name__)
 
 def main():
     logger.info("程序启动: 初始化系统配置...")
+    
+    # 设置 ChromeDriver
+    try:
+        chromedriver_path = setup_chromedriver()
+        logger.info(f"ChromeDriver 设置成功: {chromedriver_path}")
+    except Exception as e:
+        logger.error(f"ChromeDriver 设置失败: {str(e)}")
+        return
+
     # 设置环境变量
     os.environ['WDM_DISABLE_USAGE_STATS'] = 'true'
     os.environ['WDM_SSL_VERIFY'] = '0'
