@@ -3,6 +3,6 @@ webdriver-manager==4.0.1
 PyYAML==6.0.1 
 requests 
 Pillow 
-torch 
+torch==2.6.0
 torchvision
 opencv-python

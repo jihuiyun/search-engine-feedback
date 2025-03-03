@@ -436,7 +436,7 @@ class BaiduEngine(SearchEngine):
             spin_img = self.driver.find_elements(By.CSS_SELECTOR, "img.vcode-spin-img")
             if spin_img and len(spin_img) > 0:
                 logger.info("检测到旋转验证码，启动自动求解...")
-                result = solve_rotation_captcha(self.driver)
+                result = solve_rotation_captcha(self.driver)#旋转模型
                 if result:
                     logger.info("旋转验证码自动处理成功")
                     return True
