@@ -175,4 +175,4 @@ cython_debug/
 .pypirc
 
 # ChromeDriver
-drivers/chromedriver
+drivers/chromedriverDB.sqlite3*
