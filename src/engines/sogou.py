@@ -131,44 +131,149 @@ class SogouEngine(SearchEngine):
             self.driver.switch_to.window(self.driver.window_handles[-1])
             
             # 等待页面加载
-            time.sleep(2)
+            time.sleep(3)
             
             # 选择"删除快照"选项
-            delete_option = self.wait.until(
-                EC.element_to_be_clickable((By.XPATH, "//input[@value='删除快照']"))
-            )
-            delete_option.click()
+            try:
+                # 使用准确的选择器
+                delete_option = self.wait.until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "input.delradio[name='kuaizhaotype'][value='1']"))
+                )
+                self.driver.execute_script("arguments[0].click();", delete_option)
+                logger.info("成功选择删除快照选项")
+            except Exception as e:
+                logger.error(f"选择删除快照选项失败: {str(e)}")
+                return False
+            
+            # 确保选项被选中
+            time.sleep(1)
             
             # 填写快照地址
-            url_input = self.wait.until(
-                EC.presence_of_element_located((By.NAME, "url"))
-            )
-            url_input.clear()
-            url_input.send_keys(result['url'])
+            try:
+                # 使用准确的选择器
+                url_input = self.wait.until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "input.vr-input-box[name='KuaizhaoDelete[webAdr][]']"))
+                )
+                
+                # 使用 JavaScript 清除和设置值
+                self.driver.execute_script("""
+                    arguments[0].value = arguments[1];
+                    arguments[0].style.color = '#000';
+                    arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
+                    arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
+                    arguments[0].dispatchEvent(new Event('blur', { bubbles: true }));
+                """, url_input, result['url'])
+                
+                logger.info("成功填写快照地址")
+                
+                # 等待验证通过
+                time.sleep(2)
+                
+            except Exception as e:
+                logger.error(f"填写快照地址失败: {str(e)}")
+                return False
             
-            # 填写详细描述
-            description = self.wait.until(
-                EC.presence_of_element_located((By.NAME, "description"))
-            )
-            description.clear()
-            description.send_keys(self.feedback_config['description'])
-
+            # 填写原因描述
+            try:
+                description = self.wait.until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "textarea.des-area[name='KuaizhaoDelete[reason]']"))
+                )
+                
+                # 使用 JavaScript 设置值并触发事件
+                self.driver.execute_script("""
+                    arguments[0].value = arguments[1];
+                    arguments[0].style.color = '#000';
+                    arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
+                    arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
+                    arguments[0].dispatchEvent(new Event('blur', { bubbles: true }));
+                """, description, self.feedback_config['description'])
+                
+                logger.info("成功填写原因描述")
+                time.sleep(1)
+                
+            except Exception as e:
+                logger.error(f"填写原因描述失败: {str(e)}")
+                return False
+            
             # 选择申请人类型为"单位/公司"
-            applicant_type = Select(self.wait.until(
-                EC.presence_of_element_located((By.NAME, "applicant_type"))
-            ))
-            applicant_type.select_by_visible_text("单位/公司")
+            try:
+                company_radio = self.wait.until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "input.delradio[name='apptypeForm1'][value='2']"))
+                )
+                self.driver.execute_script("arguments[0].click();", company_radio)
+                logger.info("成功选择申请人类型：单位/公司")
+                time.sleep(1)
+            except Exception as e:
+                logger.error(f"选择申请人类型失败: {str(e)}")
+                return False
 
             # 上传有效资料
-            for image_path in self.engine_config['qualification_images']:
-                full_path = os.path.join(self.config['qualification_dir'], image_path)
-                if os.path.exists(full_path):
-                    file_input = self.wait.until(
-                        EC.presence_of_element_located((By.NAME, "file"))
-                    )
-                    file_input.send_keys(full_path)
-                    time.sleep(1)  # 等待上传完成
-            
+            try:
+                for image_path in self.engine_config['qualification_images']:
+                    full_path = os.path.join(self.config['qualification_dir'], image_path)
+                    if os.path.exists(full_path):
+                        # 点击添加附件按钮
+                        add_file_button = self.wait.until(
+                            EC.element_to_be_clickable((By.ID, "imgAddForm1"))
+                        )
+                        self.driver.execute_script("arguments[0].click();", add_file_button)
+                        time.sleep(2)  # 增加等待时间
+                        
+                        # 找到文件输入框并上传文件
+                        try:
+                            # 使用多个选择器属性来精确定位
+                            file_input = self.wait.until(
+                                EC.presence_of_element_located((
+                                    By.CSS_SELECTOR, 
+                                    "input[type='file'][name='imgForm1[]'][id='img']"
+                                ))
+                            )
+                            
+                            # 确保元素可见和可交互
+                            self.driver.execute_script("""
+                                arguments[0].style.display = 'block';
+                                arguments[0].style.visibility = 'visible';
+                                arguments[0].style.opacity = '1';
+                                arguments[0].style.height = '100px';
+                                arguments[0].style.width = '260px';
+                                arguments[0].style.position = 'static';
+                            """, file_input)
+                            
+                            # 等待元素变为可交互状态
+                            time.sleep(2)
+                            
+                            try:
+                                # 创建一个临时的文件选择对话框并触发点击
+                                self.driver.execute_script("""
+                                    var input = arguments[0];
+                                    input.addEventListener('change', function() {
+                                        input.dispatchEvent(new Event('change', { bubbles: true }));
+                                        input.dispatchEvent(new Event('blur', { bubbles: true }));
+                                    });
+                                    input.click();
+                                """, file_input)
+                                
+                                # 等待用户手动选择文件
+                                logger.info(f"请手动选择文件: {image_path}")
+                                time.sleep(10)  # 给用户10秒时间选择文件
+                                
+                            except Exception as e:
+                                logger.error(f"触发文件选择失败: {str(e)}")
+                                continue
+                            
+                            logger.info(f"成功上传文件: {image_path}")
+                            time.sleep(3)  # 等待上传完成
+                            
+                        except Exception as e:
+                            logger.error(f"上传单个文件失败: {str(e)}")
+                            continue
+                
+                logger.info("所有资质文件上传完成")
+                
+            except Exception as e:
+                logger.error(f"上传文件失败: {str(e)}")
+                return False
+
             # 填写邮箱
             email_input = self.wait.until(
                 EC.presence_of_element_located((By.NAME, "email"))
