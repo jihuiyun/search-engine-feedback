@@ -16,6 +16,17 @@ engines:
     url: "https://www.so.com"
     feedback_url: https://info.so.com/cache_remove.html
     cookie_file: so.com.txt
+  sogou:
+    url: "https://www.sogou.com"
+    feedback_url: "https://fankui.sogou.com/index.php/web/web/index?type=2"
+    cookie_file: sogou.com.txt
+    qualification_images:
+      - "business_license.jpg"
+      - "trademark.jpg"
+      - "authorization.jpg"
+
+# 全局配置
+qualification_dir: "company_qualifications"  # 资质图片存储目录
 
 # 搜索关键词
 keywords:
