@@ -2,6 +2,10 @@
 error_logs/
 .idea
 .DS_Store
+.vscode
+.cursorrules
+.cursor/
+DB.sqlite3
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
