@@ -159,4 +159,7 @@ feedback:
 
 # 数据库配置
 database:
-  path: "DB.sqlite3" 
+  path: "DB.sqlite3"
+  mysql_user: "network_qa_1056_u"
+  mysql_password: "M_9173e5f33c8ebd99"
+  connect_timeout: 10 

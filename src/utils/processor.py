@@ -19,7 +19,7 @@ class SearchProcessor:
         self.driver = browser_manager.driver # 浏览器驱动
         self.engines = engines # 搜索引擎
         # 初始化数据库
-        self.db = Database(self.config['database']['path'])
+        self.db = Database(self.config['database'])
 
     def highlight_result(self, result: Dict[str, Any], highlight: bool = True):
         """高亮或取消高亮搜索结果"""
