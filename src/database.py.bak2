@@ -5,36 +5,23 @@ from typing import Dict, Any
 import traceback
 
 try:
-    import mysql.connector
     MYSQL_AVAILABLE = True
-    logging.info("成功导入 mysql.connector 模块")
 except ImportError:
     MYSQL_AVAILABLE = False
-    logging.warning("mysql-connector-python 未安装，将尝试使用 PyMySQL")
+    logging.warning("正在使用 PyMySQL 连接 MySQL")
     try:
         import pymysql
         pymysql.install_as_MySQLdb()
         MYSQL_AVAILABLE = True
     except ImportError:
-        logging.error("无法导入 MySQL 连接库，请安装 mysql-connector-python 或 pymysql")
+        logging.error("无法导入 MySQL 连接库，请安装 pymysql")
 
 logger = logging.getLogger(__name__)
 
 class Database:
-
-    def _get_safe_config(self):
-        """返回不含密码的配置信息，用于日志输出"""
-        safe_config = self.mysql_config.copy()
-        if 'password' in safe_config:
-            safe_config['password'] = '******'
-        return safe_config
-
-
     def __init__(self, config):
         """初始化数据库连接"""
-        logger.info("初始化数据库连接...")
         self.sqlite_path = config.get('path', 'search_results.db')
-        logger.info(f"SQLite 数据库路径: {self.sqlite_path}")
         
         # MySQL 配置
         self.mysql_config = {
@@ -47,23 +34,16 @@ class Database:
         }
         
         # 初始化 SQLite 数据库(用于progress表)
-        logger.info("开始初始化 SQLite 数据库...")
         self.init_sqlite_db()
-        logger.info("SQLite 数据库初始化完成")
         
         # 测试 MySQL 连接并输出详细的连接信息用于调试
-        logger.info("准备测试 MySQL 连接...")
         self.mysql_available = False
         try:
-            logger.info("开始测试 MySQL 连接...")
             self._test_mysql_connection()
             self.mysql_available = True
-            logger.info("MySQL 连接测试成功，将使用 MySQL 作为主数据库")
-            print("MySQL 连接测试成功，将使用 MySQL 作为主数据库")
         except Exception as e:
             logger.error(f"MySQL 连接测试失败，将只使用 SQLite: {str(e)}")
             logger.error(traceback.format_exc())
-            logger.info("将使用 SQLite 作为备用数据库")
 
     def init_sqlite_db(self):
         """初始化SQLite数据库表"""
@@ -99,26 +79,18 @@ class Database:
     def _get_mysql_connection(self):
         """获取MySQL连接，添加重试机制"""
         if not MYSQL_AVAILABLE:
-            logger.error("MySQL 连接库未安装")
             raise Exception("MySQL 连接库未安装")
             
         max_retries = 3
         retry_count = 0
         
-        logger.info("开始获取MySQL连接...")
-        logger.info(f"全局模块: {[key for key in globals().keys() if not key.startswith('_')]}")
-        
         while retry_count < max_retries:
             try:
-                if 'mysql' in globals():
-                    logger.info("使用 mysql 模块连接数据库")
-                    return mysql.connector.connect(**self.mysql_config)
-                elif 'mysql_connector' in globals():
-                    logger.info("使用 PyMySQL(MySQLdb) 模块连接数据库")
-                    return mysql_connector.connect(**self.mysql_config)
+                if 'mysql.connector' in globals():
+                    conn = mysql.connector.connect(**self.mysql_config)
                 else:
-                    logger.error("没有可用的MySQL连接模块")
-                    raise Exception("没有可用的MySQL连接模块")
+                    conn = pymysql.connect(**self.mysql_config)
+                return conn
             except Exception as e:
                 retry_count += 1
                 logger.warning(f"MySQL 连接失败 (尝试 {retry_count}/{max_retries}): {str(e)}")
@@ -128,21 +100,22 @@ class Database:
                     raise
                 time.sleep(1)  # 等待1秒后重试
     
-
+    def _get_safe_config(self):
+        """返回不含密码的配置信息，用于日志输出"""
+        safe_config = self.mysql_config.copy()
+        if 'password' in safe_config:
+            safe_config['password'] = '******'
+        return safe_config
     
     def _test_mysql_connection(self):
         """测试MySQL连接是否可用"""
         try:
-            logger.info(f"开始测试 MySQL 连接: {self._get_safe_config()}")
-            logger.info(f"MySQL 可用状态: {MYSQL_AVAILABLE}")
-            
+            logger.info(f"测试 MySQL 连接: {self._get_safe_config()}")
             conn = self._get_mysql_connection()
-            logger.info("MySQL 连接成功获取")
-            print("MySQL 连接成功获取")
+            
             # 测试表结构
             cursor = conn.cursor()
             try:
-                logger.info("正在查询表结构...")
                 cursor.execute("SHOW COLUMNS FROM search_engine_feedback_results")
                 columns = cursor.fetchall()
                 column_names = [col[0] for col in columns]
@@ -156,14 +129,12 @@ class Database:
                     logger.warning(f"MySQL 表缺少必要的列: {missing_columns}")
             except Exception as e:
                 logger.error(f"无法查询表结构: {str(e)}")
-                logger.error(traceback.format_exc())
             
             cursor.close()
             conn.close()
             logger.info("MySQL 连接和表结构测试成功")
         except Exception as e:
             logger.error(f"测试 MySQL 连接失败: {str(e)}")
-            logger.error(traceback.format_exc())
             raise
 
     def save_result(self, result: Dict[str, Any]) -> bool:

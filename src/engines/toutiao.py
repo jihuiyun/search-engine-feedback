@@ -27,8 +27,8 @@ class ToutiaoEngine(SearchEngine):
                 logger.warning("浏览器已重新初始化")
             
             search_url = self.engine_config['url'].format(keyword=keyword)
-            self.driver.get(search_url)
-            time.sleep(2)
+            self.driver.get(search_url)  # 这里很慢
+            # time.sleep(2)
 
             # 检测验证码弹窗
             try:
@@ -40,7 +40,7 @@ class ToutiaoEngine(SearchEngine):
                     ))
                 )
                 logger.info("验证码处理完成")
-                time.sleep(2)  # 额外等待确保页面加载完成
+                # time.sleep(2)  # 额外等待确保页面加载完成
 
             except TimeoutException:
                 # 没有验证码弹窗，继续正常流程
@@ -59,7 +59,7 @@ class ToutiaoEngine(SearchEngine):
             self.wait.until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, ".result-content"))
             )
-            time.sleep(2)  # 额外等待确保页面完全加载
+            # time.sleep(2)  # 额外等待确保页面完全加载
             
             # 获取所有搜索结果项的容器
             result_items = self.driver.find_elements(
@@ -148,7 +148,7 @@ class ToutiaoEngine(SearchEngine):
             self.driver.switch_to.window(self.driver.window_handles[-1])
             
             # 等待页面加载
-            time.sleep(2)
+            # time.sleep(2)
             
             # 先检查页面内容是否包含过期标志
             if self.is_page_expired():
@@ -292,7 +292,7 @@ class ToutiaoEngine(SearchEngine):
             
             # 点击下一页
             next_link.click()
-            time.sleep(2)
+            # time.sleep(2)
             
             return True
             

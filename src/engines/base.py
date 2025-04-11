@@ -27,6 +27,11 @@ class SearchEngine(ABC):
     @abstractmethod
     def search(self, keyword: str) -> None:
         """执行搜索"""
+        # 获取浏览器信息
+        browser_info = "未知浏览器"
+        if hasattr(self.browser_manager, 'get_browser_info'):
+            browser_info = self.browser_manager.get_browser_info()
+        logger.info(f"【{browser_info}】开始搜索关键词: {keyword}")
         pass
 
     @abstractmethod
@@ -37,16 +42,31 @@ class SearchEngine(ABC):
     @abstractmethod
     def check_expired(self, url: str) -> bool:
         """检查链接是否过期"""
+        # 获取浏览器信息
+        browser_info = "未知浏览器"
+        if hasattr(self.browser_manager, 'get_browser_info'):
+            browser_info = self.browser_manager.get_browser_info()
+        logger.info(f"【{browser_info}】检查链接: {url}")
         pass
 
     @abstractmethod
     def submit_feedback(self, result: Dict[str, Any]) -> bool:
         """提交反馈"""
+        # 获取浏览器信息
+        browser_info = "未知浏览器"
+        if hasattr(self.browser_manager, 'get_browser_info'):
+            browser_info = self.browser_manager.get_browser_info()
+        logger.info(f"【{browser_info}】提交反馈: {result.get('url', '未知URL')}")
         pass
 
     @abstractmethod
     def next_page(self) -> bool:
         """跳转到下一页，返回是否存在下一页"""
+        # 获取浏览器信息
+        browser_info = "未知浏览器"
+        if hasattr(self.browser_manager, 'get_browser_info'):
+            browser_info = self.browser_manager.get_browser_info()
+        logger.info(f"【{browser_info}】尝试跳转到下一页")
         pass
 
     def is_page_expired(self, content: str = None) -> bool:

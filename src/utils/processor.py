@@ -41,6 +41,8 @@ class SearchProcessor:
 
     def process_single_result(self, engine: SearchEngine, result: Dict[str, Any], keyword: str, engine_name: str) -> bool:
         """处理单个搜索结果"""
+        browser_info = self.browser_manager.get_browser_info() if hasattr(self.browser_manager, 'get_browser_info') else "默认浏览器"
+        
         try:
             # 高亮当前处理的结果
             self.highlight_result(result, True)
@@ -54,19 +56,22 @@ class SearchProcessor:
                     result['is_expired'] = existing_result['is_expired']
                     self.db.save_result(result)
                     
-                logger.info(f"重复，跳过：{engine_name} - {keyword} - {result['title']}")
+                logger.info(f"【{browser_info}】重复，跳过：{engine_name} - {keyword} - {result['title']}")
                 return True
                 
             # 检查是否过期
-            logger.info(f"过期检测：{result['title']}")
+            logger.info(f"【{browser_info}】过期检测：{engine_name} - {keyword} - {result['title']}")
             is_expired = engine.check_expired(result['url'])
             result['is_expired'] = is_expired
             
             # 提交反馈
             if is_expired:
+                logger.info(f"【{browser_info}】发现过期链接：{engine_name} - {keyword} - {result['title']}")
                 if not engine.submit_feedback(result):
-                    logger.error("反馈提交失败")
+                    logger.error(f"【{browser_info}】反馈提交失败：{engine_name} - {keyword} - {result['title']}")
                     return True
+                else:
+                    logger.info(f"【{browser_info}】反馈提交成功：{engine_name} - {keyword} - {result['title']}")
                 
              # 保存结果
             self.db.save_result(result)
@@ -80,15 +85,17 @@ class SearchProcessor:
     def process_keyword(self, engine_name: str, keyword: str):
         """处理单个关键词"""
         engine = self.engines[engine_name]
+        browser_info = self.browser_manager.get_browser_info() if hasattr(self.browser_manager, 'get_browser_info') else "默认浏览器"
         
         # 检查是否已完成
         if self.db.check_keyword_done(keyword, engine_name):
-            logger.info(f"跳过已完成关键词: {engine_name} - {keyword}")
+            logger.info(f"【{browser_info}】跳过已完成关键词: {engine_name} - {keyword}")
+            print(f"【{browser_info}】跳过已完成关键词: {engine_name} - {keyword}")
             return
             
         # 确保登录状态
         if not engine.load_cookies_and_login():
-            logger.error(f"登录失败: {engine_name}")
+            logger.error(f"【{browser_info}】登录失败: {engine_name}")
             return
         # 开始正式检索查询    
         try:
@@ -101,7 +108,7 @@ class SearchProcessor:
                 results = engine.get_search_results() # 保存当前页检索条目
                 
                 if not results:
-                    logger.info(f"搜索完成: {engine_name} - {keyword}")
+                    logger.info(f"【{browser_info}】搜索完成: {engine_name} - {keyword}")
                     self.db.save_progress(keyword, engine_name, is_done=True)
                     break
                     
@@ -112,40 +119,44 @@ class SearchProcessor:
                     
                     # 处理单个结果
                     if not self.process_single_result(engine, result, keyword, engine_name):
+                        logger.info(f"【{browser_info}】处理中断: {engine_name} - {keyword}")
                         return
                         
                 # 尝试下一页
                 if not engine.next_page():
-                    logger.info(f"已到最后一页: {engine_name} - {keyword}")
+                    logger.info(f"【{browser_info}】已到最后一页，关键词完成: {engine_name} - {keyword}")
                     self.db.save_progress(keyword, engine_name, is_done=True)
                     break
                 
                 current_page += 1
                 
                 if current_page > Limit:
-                    logger.info(f"已处理到第 {current_page} 页，停止处理关键词: {keyword}")
+                    logger.info(f"【{browser_info}】已处理到第 {current_page} 页，关键词完成: {engine_name} - {keyword}")
                     self.db.save_progress(keyword, engine_name, is_done=True)
                     break
 
                 time.sleep(1)  # 翻页后等待加载
                 
         except Exception as e:
-            logger.error(f"处理关键词出错: {str(e)}")
+            logger.error(f"【{browser_info}】处理关键词出错: {keyword} - {str(e)}")
 
     def run(self):
         """运行主程序"""
         try:
             for engine_name in self.engines:
-                logger.info(f"开始处理 {engine_name} 引擎的搜索任务")
+                browser_info = self.browser_manager.get_browser_info() if hasattr(self.browser_manager, 'get_browser_info') else "默认浏览器"
+                logger.info(f"【{browser_info}】开始处理 {engine_name} 引擎的搜索任务")
                 for keyword in self.config['keywords']:
                     # 检查关键词是否已完成
                     is_done = self.db.check_keyword_done(keyword, engine_name)
                     if is_done:
-                        logger.info(f"跳过已完成关键词: {engine_name} 搜索 '{keyword}'")
+                        print(f"【{browser_info}】跳过已完成关键词: {engine_name} 搜索 '{keyword}'")
+                        logger.info(f"【{browser_info}】跳过已完成关键词: {engine_name} 搜索 '{keyword}'")
                         continue
                         
-                    logger.info(f"开始关键词搜索: {engine_name} 搜索 '{keyword}'")
+                    logger.info(f"【{browser_info}】开始关键词搜索: {engine_name} 搜索 '{keyword}'")
+                    print(f"【{browser_info}】开始关键词搜索: {engine_name} 搜索 '{keyword}'")
                     self.process_keyword(engine_name, keyword)
-                logger.info(f"完成 {engine_name} 引擎的所有关键词处理")
+                logger.info(f"【{browser_info}】完成 {engine_name} 引擎的所有关键词处理")
         finally:
             self.browser_manager.quit() 
