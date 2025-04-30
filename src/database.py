@@ -112,7 +112,9 @@ class Database:
             try:
                 if 'mysql' in globals():
                     logger.info("使用 mysql 模块连接数据库")
-                    return mysql.connector.connect(**self.mysql_config)
+                    config = self.mysql_config.copy()
+                    config['consume_results'] = True
+                    return mysql.connector.connect(**config)
                 elif 'mysql_connector' in globals():
                     logger.info("使用 PyMySQL(MySQLdb) 模块连接数据库")
                     return mysql_connector.connect(**self.mysql_config)
