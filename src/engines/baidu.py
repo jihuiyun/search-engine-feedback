@@ -48,8 +48,11 @@ class BaiduEngine(SearchEngine):
             
             # 构造搜索 URL
             search_url = f"{self.engine_config['url']}s?wd={keyword}"
+            logger.info(f"开始搜索: {keyword}")
+            logger.info(f"访问URL: {search_url}")
+            
             self.driver.get(search_url)
-            time.sleep(2)
+            # time.sleep(2)
             
             # 检查登录状态
             while True:  # 添加循环来处理所有可能的状态
@@ -57,7 +60,7 @@ class BaiduEngine(SearchEngine):
                 if self.check_verification():
                     logger.info("检测到需要验证码，等待处理...")
                     if not self.wait_for_verification():
-                        logger.error("验证码处理失败")
+                        logger.error("验证码处理失败，跳过当前搜索")
                         return None
                     time.sleep(2)  # 等待页面刷新
                     continue  # 验证码处理完后重新检查状态
@@ -76,15 +79,22 @@ class BaiduEngine(SearchEngine):
                     
                     # cookies 登录失败或没有 cookies，等待手动登录
                     logger.warning("等待用户手动登录...")
+                    login_timeout = 60  # 设置登录超时时间为60秒
+                    login_start_time = time.time()
+                    
                     while not self.check_login():
+                        if time.time() - login_start_time > login_timeout:
+                            logger.error("登录超时，跳过当前搜索")
+                            return None
                         time.sleep(2)
                         if not self.ensure_browser():
+                            logger.error("浏览器连接断开，跳过当前搜索")
                             return None
                         
                         # 检查是否需要验证码
                         if self.check_verification():
                             if not self.wait_for_verification():
-                                logger.error("验证码处理失败")
+                                logger.error("验证码处理失败，跳过当前搜索")
                                 return None
                             time.sleep(2)  # 等待页面刷新
                             break  # 验证码处理完后跳出内层循环，重新检查状态
@@ -93,6 +103,7 @@ class BaiduEngine(SearchEngine):
                 
                 # 登录成功，保存 cookies
                 logger.info("登录成功，保存 cookies")
+                print("登录成功，保存 cookies")
                 self.browser_manager.save_cookies('baidu.com')
                 break  # 所有状态都正常，退出循环
             
@@ -112,7 +123,7 @@ class BaiduEngine(SearchEngine):
                     login_popup = self.driver.find_element(By.CLASS_NAME, "passport-login-pop")
                     if login_popup.is_displayed():
                         logger.info("等待用户登录中...")
-                        time.sleep(2)
+                        # time.sleep(2)
                         continue
                 except NoSuchElementException:
                     # 检查是否已登录成功（查找用户头像）
@@ -120,10 +131,11 @@ class BaiduEngine(SearchEngine):
                         user_avatar = self.driver.find_element(By.CLASS_NAME, "user-name")
                         if user_avatar.is_displayed():
                             logger.info("登录成功")
+                            print("登录成功")
                             return True
                     except NoSuchElementException:
                         logger.info("等待登录完成...")
-                        time.sleep(2)
+                        # time.sleep(2)
                         continue
                 
         except Exception as e:
@@ -135,10 +147,17 @@ class BaiduEngine(SearchEngine):
         results = []
         try:
             # 等待搜索结果加载
-            self.wait.until(EC.presence_of_element_located((By.ID, "content_left")))
+            logger.info("等待搜索结果加载...")
+            try:
+                self.wait.until(EC.presence_of_element_located((By.ID, "content_left")))
+                logger.info("搜索结果加载完成")
+            except TimeoutException:
+                logger.error("搜索结果加载超时")
+                return results
             
             # 获取所有搜索结果项
             result_items = self.driver.find_elements(By.CSS_SELECTOR, "div.result.c-container, div.result-op.c-container")
+            logger.info(f"找到 {len(result_items)} 条搜索结果")
             
             for item in result_items:
                 try:
@@ -153,10 +172,12 @@ class BaiduEngine(SearchEngine):
                             continue
                     
                     if not title_element:
+                        logger.debug("未找到标题元素，跳过当前结果")
                         continue
 
                     # 获取标题
                     title = title_element.text.strip()
+                    logger.debug(f"处理搜索结果: {title}")
                     
                     # 检查标题是否重复
                     if any(r['title'] == title for r in results):
@@ -166,6 +187,7 @@ class BaiduEngine(SearchEngine):
                     # 从父级 div 的 mu 属性获取真实 URL
                     url = item.get_attribute('mu') or title_element.get_attribute('href')
                     if not url:
+                        logger.debug("未找到URL，跳过当前结果")
                         continue
                     
                     result = {
@@ -174,11 +196,13 @@ class BaiduEngine(SearchEngine):
                         'element': item
                     }
                     results.append(result)
-                    
+                    logger.debug(f"成功添加搜索结果: {title}")
+                    print(f"成功添加搜索结果: {title}")
                 except Exception as e:
                     logger.error(f"处理搜索结果项时出错: {str(e)}")
                     continue
                 
+            logger.info(f"共处理 {len(results)} 条有效搜索结果")
             return results
             
         except Exception as e:
@@ -188,15 +212,17 @@ class BaiduEngine(SearchEngine):
     def check_expired(self, url: str) -> bool:
         """检查链接是否过期"""
         if not self.ensure_browser():
+            logger.error("浏览器连接断开，无法检查链接")
             return False
             
-        current_window = self.driver.current_window_handle # 保存了原始窗口的句柄，以便在完成新窗口的操作后可以返回到原始窗口
+        current_window = self.driver.current_window_handle
+        logger.info(f"开始检查链接: {url}")
         
         try:
             # 新标签页打开链接
             self.driver.execute_script(f"window.open('{url}', '_blank');")
-            time.sleep(1)
-            self.driver.switch_to.window(self.driver.window_handles[-1]) # 主要作用是让 Selenium 切换到最后打开的窗口或标签页，以便您可以在该窗口中执行后续操作
+            # time.sleep(1)
+            self.driver.switch_to.window(self.driver.window_handles[-1])
             
             # 等待页面加载
             time.sleep(1)
@@ -207,7 +233,6 @@ class BaiduEngine(SearchEngine):
                 return True
             
             # 检查重定向
-
             if self.wait_for_redirect(self.config['expired_conditions']['redirect_timeout']):
                 logger.info("检测到页面发生重定向")
                 return True
@@ -215,10 +240,18 @@ class BaiduEngine(SearchEngine):
             logger.info("页面正常访问")
             return False
             
+        except Exception as e:
+            logger.error(f"检查链接时出错: {str(e)}")
+            return False
         finally:
-            self.driver.close()
-            self.driver.switch_to.window(current_window) # 返回原来的窗口
-            time.sleep(1)
+            try:
+                self.driver.close()
+                self.driver.switch_to.window(current_window)
+                time.sleep(1)
+            except Exception as e:
+                logger.error(f"关闭标签页时出错: {str(e)}")
+                # 如果关闭失败，尝试重新初始化浏览器
+                self.ensure_browser()
 
     def submit_feedback(self, result: Dict[str, Any]) -> bool:
         """提交反馈"""

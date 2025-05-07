@@ -50,13 +50,14 @@ class SearchProcessor:
             # 检查是否已处理过
             existing_result = self.db.get_existing_result(result['url'])
             same = self.db.get_existing_result(None, keyword, engine_name, result['title'])
-
-            if existing_result or same:
+            
+            if existing_result or same: # 如果已处理过
                 if not same:
                     result['is_expired'] = existing_result['is_expired']
                     self.db.save_result(result)
                     
                 logger.info(f"【{browser_info}】重复，跳过：{engine_name} - {keyword} - {result['title']}")
+                print(f"【{browser_info}】重复，跳过：{engine_name} - {keyword} - {result['title']}")
                 return True
                 
             # 检查是否过期
@@ -116,7 +117,7 @@ class SearchProcessor:
                     # 添加关键词和搜索引擎信息
                     result['keyword'] = keyword
                     result['search_engine'] = engine_name
-                    
+                    print(f"【{browser_info}】处理：{engine_name} - {keyword} - {result['title']}")
                     # 处理单个结果
                     if not self.process_single_result(engine, result, keyword, engine_name):
                         logger.info(f"【{browser_info}】处理中断: {engine_name} - {keyword}")

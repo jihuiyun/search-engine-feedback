@@ -8,7 +8,7 @@ import os
 import time
 import ssl
 import certifi
-from webdriver_manager.chrome import ChromeDriverManager
+from webdriver_manager.chrome import ChromeDriverManager 
 import platform
 import shutil
 import urllib.request

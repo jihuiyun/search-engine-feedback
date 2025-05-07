@@ -57,16 +57,16 @@ def main():
         # 初始化搜索引擎
         logger.info("初始化搜索引擎...")
         engines = {
-            # 'baidu': BaiduEngine(config_path, browser_manager),
+            'baidu': BaiduEngine(config_path, browser_manager),
             # 'sogou': SogouEngine(config_path, browser_manager),
-            'toutiao': ToutiaoEngine(config_path, browser_manager),
+            # 'toutiao': ToutiaoEngine(config_path, browser_manager),
             # 'so360': So360Engine(config_path, browser_manager),
             # 'bing': BingEngine(config_path, browser_manager),
         }
         
         # 创建处理器并运行ß
         logger.info("开始执行搜索任务...")
-        processor = SearchProcessor(config_path, browser_manager, engines)
+        processor = SearchProcessor(config_path, browser_manager, engines) # 创建处理器 验证哪些关键词检索过
         processor.run()
     except Exception as e:
         logger.error(f"程序执行出错: {str(e)}")
