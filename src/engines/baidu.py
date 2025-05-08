@@ -263,7 +263,7 @@ class BaiduEngine(SearchEngine):
             
             # 滚动到页面底部
             self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(1)
+            # time.sleep(1)
             
             # 查找并点击页面底部的反馈按钮
             feedback_btn = self.wait.until(

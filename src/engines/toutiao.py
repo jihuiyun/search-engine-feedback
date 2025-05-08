@@ -10,6 +10,8 @@ import logging
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import WebDriverWait
 from urllib.parse import unquote
+import sys
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +73,7 @@ class ToutiaoEngine(SearchEngine):
             
             for index, item in enumerate(result_items):
                 try:
-                    print(f"\n处理第 {index + 1} 个结果项:")
+                    # print(f"\n处理第 {index + 1} 个结果项:")
 
                     # 获取标题和链接 - 尝试多个可能的选择器
                     title_element = None
@@ -97,6 +99,9 @@ class ToutiaoEngine(SearchEngine):
                         )
                     except NoSuchElementException:
                         print("未找到反馈按钮")
+                        print("检测到未找到反馈按钮，自动重启程序……")
+                        python = sys.executable
+                        os.execv(python, [python] + sys.argv)
                         continue
 
                     # 获取真实的 URL
@@ -167,9 +172,9 @@ class ToutiaoEngine(SearchEngine):
         finally:
             # 关闭当前标签页,切回原标签页
             self.driver.close()
-            time.sleep(1)  # 等待标签页关闭
+            # time.sleep(1)  # 等待标签页关闭
             self.driver.switch_to.window(current_window)
-            time.sleep(1)  # 等待切换完成
+            # time.sleep(1)  # 等待切换完成
 
     def submit_feedback(self, result: Dict[str, Any]) -> bool:
         """提交反馈"""
@@ -181,7 +186,7 @@ class ToutiaoEngine(SearchEngine):
             # 滚动到元素可见
             element = result['element']
             self.driver.execute_script("arguments[0].scrollIntoView(true);", element)
-            time.sleep(1)
+            # time.sleep(1)
             
             # 鼠标悬停在反馈按钮上
             actions = ActionChains(self.driver)
@@ -255,7 +260,7 @@ class ToutiaoEngine(SearchEngine):
                 
                 # 确保按钮在视图中
                 self.driver.execute_script("arguments[0].scrollIntoView(true);", submit_btn)
-                time.sleep(1)
+                # time.sleep(1)
                 
                 # 尝试用 JavaScript 点击
                 self.driver.execute_script("arguments[0].click();", submit_btn)
@@ -307,7 +312,7 @@ class ToutiaoEngine(SearchEngine):
                 if not self.ensure_browser():
                     logger.warning("浏览器已重新初始化，重新加载页面")
                     self.driver.get(self.driver.current_url)
-                    time.sleep(3)
+                    # time.sleep(3)
                 
                 logger.info(f"检查第 {index} 条结果: {result['title']}")
                 logger.info(f"URL: {result['url']}")
@@ -359,7 +364,7 @@ class ToutiaoEngine(SearchEngine):
                                     break
                             except TimeoutException:
                                 logger.info("等待用户点击反馈按钮...")
-                                time.sleep(5)  # 每5秒检查一次
+                                time.sleep(2)  # 每5秒检查一次
                                 # 确保浏览器会话仍然有效
                                 if not self.ensure_browser():
                                     raise Exception("浏览器会话已断开")
