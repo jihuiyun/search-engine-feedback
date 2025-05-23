@@ -13,6 +13,9 @@ import platform
 import shutil
 import urllib.request
 import zipfile
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +43,7 @@ class BrowserManager:
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--disable-extensions')
-        options.add_argument('--headless')  # 添加无头模式
+        # options.add_argument('--headless')  # 添加无头模式
         options.add_argument('--window-size=1920,1080')    # 设置窗口大小
         
         # 设置下载路径
@@ -252,4 +255,28 @@ class BrowserManager:
             window_id = window_handle[-6:] if len(window_handle) > 6 else window_handle
             return f"浏览器-{window_id}"
         except Exception as e:
-            return "浏览器实例" 
+            return "浏览器实例"
+
+    def find_feedback_button(self, url):
+        self.driver.get(url)
+        try:
+            button = WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((By.XPATH, "//button[text()='反馈']"))
+            )
+            return button
+        except Exception as e:
+            print("未找到反馈按钮")
+            raise e
+
+# def is_duplicate(key_word, url):
+#     # 查询数据库，判断是否已存在
+#     return db.query("select count(*) from feedback where key_word=? and url=?", (key_word, url)) > 0
+
+# if not is_duplicate(key_word, url):
+#     # 执行反馈
+#     feedback(key_word, url) 
+# else:
+#     # 跳过
+#     pass 
+
+

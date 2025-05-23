@@ -110,7 +110,14 @@ class SearchProcessor: # 搜索处理器
             logger.info(f"【{browser_info}】跳过已完成关键词: {engine_name} - {keyword}")
             print(f"跳过已完成关键词: {engine_name} - {keyword}")
             return
-            
+        
+        # 关键词异常计数器
+        retry_key = f"{engine_name}::{keyword}"
+        if not hasattr(self, '_keyword_retry_count'):
+            self._keyword_retry_count = {}
+        if retry_key not in self._keyword_retry_count:
+            self._keyword_retry_count[retry_key] = 0
+        
         # 确保登录状态
         if not engine.load_cookies_and_login():
             logger.error(f"【{browser_info}】登录失败: {engine_name}")
@@ -127,36 +134,41 @@ class SearchProcessor: # 搜索处理器
                 
                 if not results:
                     logger.info(f"【{browser_info}】搜索完成: {engine_name} - {keyword}")
-                    self.db.save_progress(keyword, engine_name, is_done=True)
                     break
                     
                 for result in results:
-                    # 添加关键词和搜索引擎信息
                     result['keyword'] = keyword
                     result['search_engine'] = engine_name
-                    # print(f"处理：{engine_name} - {keyword} - {result['title']}")
                     # 处理单个结果
                     if not self.process_single_result(engine, result, keyword, engine_name):
                         logger.info(f"【{browser_info}】处理中断: {engine_name} - {keyword}")
+                        # 异常计数+1
+                        self._keyword_retry_count[retry_key] += 1
+                        if self._keyword_retry_count[retry_key] >= 10:
+                            logger.info(f"【{browser_info}】关键词异常/重启次数已达上限，强制标记为已完成: {engine_name} - {keyword}")
+                            self.db.save_progress(keyword, engine_name, is_done=True)
                         return
                         
-                # 尝试下一页
                 if not engine.next_page():
                     logger.info(f"【{browser_info}】已到最后一页，关键词完成: {engine_name} - {keyword}")
-                    self.db.save_progress(keyword, engine_name, is_done=True)
                     break
                 
                 current_page += 1
                 
                 if current_page > Limit:
                     logger.info(f"【{browser_info}】已处理到第 {current_page} 页，关键词完成: {engine_name} - {keyword}")
-                    self.db.save_progress(keyword, engine_name, is_done=True)
                     break
 
                 time.sleep(1)  # 翻页后等待加载
-                
+            # 只有所有流程顺利跑完才写入完成状态
+            self.db.save_progress(keyword, engine_name, is_done=True)
         except Exception as e:
             logger.error(f"【{browser_info}】处理关键词出错: {keyword} - {str(e)}")
+            # 异常计数+1
+            self._keyword_retry_count[retry_key] += 1
+            if self._keyword_retry_count[retry_key] >= 10:
+                logger.info(f"【{browser_info}】关键词异常/重启次数已达上限，强制标记为已完成: {engine_name} - {keyword}")
+                self.db.save_progress(keyword, engine_name, is_done=True)
 
     def run(self):
         """运行主程序"""

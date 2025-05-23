@@ -197,12 +197,13 @@ class BaiduEngine(SearchEngine):
                     }
                     results.append(result)
                     logger.debug(f"成功添加搜索结果: {title}")
-                    print(f"成功添加搜索结果: {title}")
+                    # print(f"成功添加搜索结果: {title}")
                 except Exception as e:
                     logger.error(f"处理搜索结果项时出错: {str(e)}")
                     continue
                 
             logger.info(f"共处理 {len(results)} 条有效搜索结果")
+            print(f"共处理 {len(results)} 条有效搜索结果")  
             return results
             
         except Exception as e:
@@ -270,7 +271,7 @@ class BaiduEngine(SearchEngine):
                 EC.element_to_be_clickable((By.CSS_SELECTOR, "a.feedback"))
             )
             feedback_btn.click()
-            time.sleep(1)
+            # time.sleep(1)
 
             # 等待反馈弹窗加载
             try:

@@ -176,22 +176,18 @@ class Database:
             return self._save_result_sqlite(result)
     
     def _save_result_mysql(self, result: Dict[str, Any]) -> bool:
-        """保存搜索结果到 MySQL"""
+        """保存搜索结果到 MySQL，search_engine+url唯一"""
         conn = None
         try:
             conn = self._get_mysql_connection()
             cursor = conn.cursor()
             
-            # 记录操作详情，方便调试
-            logger.debug(f"保存到 MySQL - 关键词: {result['keyword']}, URL: {result['url'][:30]}...")
-            
-            # 先检查是否存在记录
+            # 只用search_engine+url查重
             check_query = """
                 SELECT sysid FROM search_engine_feedback_results 
-                WHERE key_word = %s AND search_engine = %s AND url = %s
+                WHERE search_engine = %s AND url = %s
             """
             cursor.execute(check_query, (
-                result['keyword'],
                 result['search_engine'],
                 result['url']
             ))
@@ -214,15 +210,16 @@ class Database:
                 ))
                 logger.debug(f"MySQL: 插入新记录 - {result['title'][:20]}...")
             else:
-                # 存在则更新
+                # 存在则只更新，不再插入新行
                 update_query = """
                     UPDATE search_engine_feedback_results 
-                    SET is_expired = %s, last_updated = NOW()
-                    WHERE key_word = %s AND search_engine = %s AND url = %s
+                    SET key_word = %s, title = %s, is_expired = %s, last_updated = NOW()
+                    WHERE search_engine = %s AND url = %s
                 """
                 cursor.execute(update_query, (
-                    1 if result['is_expired'] else 0,
                     result['keyword'],
+                    result['title'],
+                    1 if result['is_expired'] else 0,
                     result['search_engine'],
                     result['url']
                 ))
@@ -247,7 +244,7 @@ class Database:
                     pass
     
     def _save_result_sqlite(self, result: Dict[str, Any]) -> bool:
-        """保存搜索结果到 SQLite (后备方案)"""
+        """保存搜索结果到 SQLite (后备方案)，search_engine+url唯一"""
         try:
             with sqlite3.connect(self.sqlite_path) as conn:
                 cursor = conn.cursor()
@@ -272,11 +269,11 @@ class Database:
                         )
                     ''')
                 
-                # 检查是否存在记录
+                # 只用search_engine+url查重
                 cursor.execute('''
                     SELECT id FROM results 
-                    WHERE keyword = ? AND search_engine = ? AND url = ?
-                ''', (result['keyword'], result['search_engine'], result['url']))
+                    WHERE search_engine = ? AND url = ?
+                ''', (result['search_engine'], result['url']))
                 
                 if not cursor.fetchone():
                     # 不存在则插入
@@ -292,14 +289,15 @@ class Database:
                         result['is_expired']
                     ))
                 else:
-                    # 存在则更新
+                    # 存在则只更新，不再插入新行
                     cursor.execute('''
                         UPDATE results 
-                        SET is_expired = ?, last_updated = datetime('now')
-                        WHERE keyword = ? AND search_engine = ? AND url = ?
+                        SET keyword = ?, title = ?, is_expired = ?, last_updated = datetime('now')
+                        WHERE search_engine = ? AND url = ?
                     ''', (
-                        result['is_expired'],
                         result['keyword'],
+                        result['title'],
+                        result['is_expired'],
                         result['search_engine'],
                         result['url']
                     ))
