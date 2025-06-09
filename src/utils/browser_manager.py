@@ -43,7 +43,7 @@ class BrowserManager:
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--disable-extensions')
-        # options.add_argument('--headless')  # 添加无头模式
+        options.add_argument('--headless')  # 添加无头模式
         options.add_argument('--window-size=1920,1080')    # 设置窗口大小
         
         # 设置下载路径

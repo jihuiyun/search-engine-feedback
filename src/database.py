@@ -265,6 +265,7 @@ class Database:
                             url TEXT NOT NULL,
                             search_engine TEXT NOT NULL,
                             is_expired BOOLEAN NOT NULL,
+                            feedback_failed BOOLEAN DEFAULT 0,
                             last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                         )
                     ''')
@@ -279,25 +280,27 @@ class Database:
                     # 不存在则插入
                     cursor.execute('''
                         INSERT INTO results (
-                            keyword, title, url, search_engine, is_expired, last_updated
-                        ) VALUES (?, ?, ?, ?, ?, datetime('now'))
+                            keyword, title, url, search_engine, is_expired, feedback_failed, last_updated
+                        ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
                     ''', (
                         result['keyword'],
                         result['title'],
                         result['url'],
                         result['search_engine'],
-                        result['is_expired']
+                        result['is_expired'],
+                        result.get('feedback_failed', False)
                     ))
                 else:
                     # 存在则只更新，不再插入新行
                     cursor.execute('''
                         UPDATE results 
-                        SET keyword = ?, title = ?, is_expired = ?, last_updated = datetime('now')
+                        SET keyword = ?, title = ?, is_expired = ?, feedback_failed = ?, last_updated = datetime('now')
                         WHERE search_engine = ? AND url = ?
                     ''', (
                         result['keyword'],
                         result['title'],
                         result['is_expired'],
+                        result.get('feedback_failed', False),
                         result['search_engine'],
                         result['url']
                     ))

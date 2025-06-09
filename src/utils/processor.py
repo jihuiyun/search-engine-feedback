@@ -49,26 +49,25 @@ class SearchProcessor: # 搜索处理器
             # 高亮当前处理的结果
             self.highlight_result(result, True)
             
-            # 新增：如果数据库已存在该search_engine+url，直接跳过后续所有处理，保证search_engine+url唯一
-            engine_url_exists = self.db.get_existing_result(url=result['url'], search_engine=engine_name)
-            if engine_url_exists:
-                logger.info(f"【{browser_info}】search_engine+url已存在数据库，跳过所有处理: {engine_name} - {result['url']}")
-                print(f"search_engine+url已存在数据库，跳过所有处理: {engine_name} - {result['url']}")
+            # 检查数据库中是否已存在相同的title+url且已过期的记录
+            # 如果存在且is_expired=1，说明已经处理过反馈，直接跳过
+            existing_expired_record = self.db.get_existing_result(None, keyword, engine_name, result['title'])
+            if existing_expired_record and existing_expired_record.get('is_expired'):
+                logger.info(f"【{browser_info}】该链接已存在过期记录，跳过反馈: {engine_name} - {result['title']}")
+                print(f"该链接已存在过期记录，跳过反馈: {engine_name} - {result['title']}")
                 return True
             
-            # 检查是否已处理过
-            existing_result = self.db.get_existing_result(result['url'])
-            same = self.db.get_existing_result(None, keyword, engine_name, result['title'])
+            # 检查search_engine+url是否已存在
+            engine_url_exists = self.db.get_existing_result(url=result['url'], search_engine=engine_name)
+            if engine_url_exists and engine_url_exists.get('is_expired'):
+                logger.info(f"【{browser_info}】该URL已存在过期记录，跳过反馈: {engine_name} - {result['url']}")
+                print(f"该URL已存在过期记录，跳过反馈: {engine_name} - {result['url']}")
+                return True
+            elif engine_url_exists:
+                logger.info(f"【{browser_info}】该URL已存在但未过期，跳过处理: {engine_name} - {result['url']}")
+                print(f"该URL已存在但未过期，跳过处理: {engine_name} - {result['url']}")
+                return True
             
-            # if existing_result or same: # 如果已处理过
-            #     if not same: # 如果已处理过，但不是同一个关键词，则更新is_expired
-            #         result['is_expired'] = existing_result['is_expired']
-            #         self.db.save_result(result)
-                    
-            #     logger.info(f"【{browser_info}】重复，跳过：{engine_name} - {keyword} - {result['title']}")
-            #     print(f"【{browser_info}】重复，跳过：{engine_name} - {keyword} - {result['title']}")
-            #     return True
-                
             # 检查是否过期
             logger.info(f"【{browser_info}】过期检测：{engine_name} - {keyword} - {result['title']}")
             is_expired = engine.check_expired(result['url'])
@@ -77,9 +76,16 @@ class SearchProcessor: # 搜索处理器
             # 提交反馈
             if is_expired:
                 logger.info(f"【{browser_info}】发现过期链接：{engine_name} - {keyword} - {result['title']}")
-                if not engine.submit_feedback(result):
+                feedback_success = engine.submit_feedback(result)
+                
+                if not feedback_success:
                     logger.error(f"【{browser_info}】反馈提交失败：{engine_name} - {keyword} - {result['title']}")
                     print(f"反馈提交失败：{engine_name} - {keyword} - {result['title']}")
+                    
+                    # 即使反馈失败也要保存记录，标记为过期，下次启动时会跳过
+                    self.db.save_result(result)
+                    logger.info(f"【{browser_info}】已保存过期记录，下次启动时会跳过：{result['url']}")
+                    
                     print("检测到反馈失败，自动重启程序……")
                     logger.error("检测到反馈失败，自动重启程序……")
                     python = sys.executable
@@ -88,7 +94,8 @@ class SearchProcessor: # 搜索处理器
                 else:
                     logger.info(f"【{browser_info}】反馈提交成功：{engine_name} - {keyword} - {result['title']}")
                     print(f"反馈提交成功：{engine_name} - {keyword} - {result['title']}")
-                # 只有反馈成功才保存结果
+                
+                # 无论反馈成功还是失败都保存结果
                 self.db.save_result(result)
             else:
                 # 未过期的直接保存
