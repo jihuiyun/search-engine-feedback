@@ -86,8 +86,18 @@ class SearchProcessor: # 搜索处理器
                     self.db.save_result(result)
                     logger.info(f"【{browser_info}】已保存过期记录，下次启动时会跳过：{result['url']}")
                     
-                    print("检测到反馈失败，自动重启程序……")
-                    logger.error("检测到反馈失败，自动重启程序……")
+                    print("检测到反馈失败，清理缓存并重启程序……")
+                    logger.error("检测到反馈失败，清理缓存并重启程序……")
+                    
+                    # 在重启前清理浏览器缓存
+                    try:
+                        if hasattr(self.browser_manager, 'restart_with_cache_clear'):
+                            logger.info("清理浏览器缓存...")
+                            self.browser_manager.restart_with_cache_clear()
+                            time.sleep(2)
+                    except Exception as cache_error:
+                        logger.warning(f"清理缓存失败: {str(cache_error)}")
+                    
                     python = sys.executable
                     os.execv(python, [python] + sys.argv)
                     return True

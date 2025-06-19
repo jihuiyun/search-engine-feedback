@@ -19,26 +19,40 @@ class So360Engine(SearchEngine):
 
     def search(self, keyword: str) -> None:
         """执行360搜索"""
-        try:
-            if not self.ensure_browser():
-                logger.warning("浏览器状态: 已重新初始化")
+        max_retries = 2
+        for attempt in range(max_retries):
+            try:
+                # 第一次失败后清理缓存重试
+                clear_cache = attempt > 0
+                if not self.ensure_browser(clear_cache=clear_cache):
+                    if clear_cache:
+                        logger.warning("浏览器状态: 已清理缓存并重新初始化")
+                    else:
+                        logger.warning("浏览器状态: 已重新初始化")
+                
+                # 访问搜索页面
+                self.driver.get(self.engine_config['url'])
+                time.sleep(2)
+                
+                # 查找搜索输入框
+                search_input = self.wait.until(
+                    EC.presence_of_element_located((By.ID, "input"))
+                )
+                search_input.clear()
+                search_input.send_keys(keyword)
+                search_input.send_keys(Keys.RETURN)
+                time.sleep(2)
+                
+                # 成功则退出重试循环
+                logger.info(f"360搜索成功: {keyword}")
+                return
+                
+            except Exception as e:
+                logger.error(f"搜索错误 (尝试 {attempt + 1}/{max_retries}): {str(e)}")
+                if attempt == max_retries - 1:  # 最后一次尝试
+                    raise
+                time.sleep(3)  # 重试前等待
             
-            # 访问搜索页面
-            self.driver.get(self.engine_config['url'])
-            time.sleep(2)
-            
-            # 查找搜索输入框
-            search_input = self.wait.until(
-                EC.presence_of_element_located((By.ID, "input"))
-            )
-            search_input.clear()
-            search_input.send_keys(keyword)
-            search_input.send_keys(Keys.RETURN)
-            time.sleep(2)
-            
-        except Exception as e:
-            logger.error(f"搜索错误: {str(e)}")
-
     def get_search_results(self) -> List[Dict[str, Any]]:
         """获取搜索结果列表"""
         results = []

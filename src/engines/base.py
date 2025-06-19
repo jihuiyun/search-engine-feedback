@@ -70,8 +70,20 @@ class SearchEngine(ABC):
         pass
 
     def is_page_expired(self, content: str = None) -> bool:
-        page_content = content or self.driver.find_element(By.TAG_NAME, "body").text
         """检查页面内容是否符合过期条件"""
+        if content:
+            page_content = content
+        else:
+            try:
+                # 等待页面完全加载，确保body元素存在
+                wait = WebDriverWait(self.driver, 10)
+                body_element = wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+                page_content = body_element.text
+                
+            except Exception as e:
+                logger.warning(f"获取页面内容失败: {str(e)}")
+                return False
+        
         expired_texts = self.config['expired_conditions']['texts']
         # 将页面内容转换为小写以进行不区分大小写的匹配
         content_lower = page_content.lower()
@@ -84,9 +96,9 @@ class SearchEngine(ABC):
         time.sleep(timeout)
         return self.driver.current_url != start_url 
 
-    def ensure_browser(self):
+    def ensure_browser(self, clear_cache=False):
         """确保浏览器正常"""
-        if not self.browser_manager.check_browser():
+        if not self.browser_manager.check_browser(clear_cache=clear_cache):
             self.driver = self.browser_manager.driver
             self.wait = self.browser_manager.wait
             return False

@@ -33,9 +33,18 @@ class BrowserManager:
                 os.makedirs(directory)
         self.init_browser()
     
-    def init_browser(self):
+    def init_browser(self, clear_cache=False):
         """初始化浏览器"""
         logger.info("浏览器: 开始初始化...")
+        
+        # 如果需要清理缓存，先关闭现有浏览器
+        if clear_cache and self.driver:
+            logger.info("浏览器: 清理缓存，关闭现有浏览器实例")
+            try:
+                self.driver.quit()
+            except:
+                pass
+            self.driver = None
         
         # 创建 Chrome 选项
         options = webdriver.ChromeOptions()
@@ -43,8 +52,22 @@ class BrowserManager:
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--disable-extensions')
-        options.add_argument('--headless')  # 添加无头模式
+        # options.add_argument('--headless')  # 添加无头模式
         options.add_argument('--window-size=1920,1080')    # 设置窗口大小
+        
+        # 如果需要清理缓存，添加相关参数
+        if clear_cache:
+            logger.info("浏览器: 添加缓存清理参数")
+            options.add_argument('--disable-application-cache')
+            options.add_argument('--disable-offline-load-stale-cache')
+            options.add_argument('--disk-cache-size=0')
+            options.add_argument('--media-cache-size=0')
+            options.add_argument('--aggressive-cache-discard')
+            # 使用临时用户数据目录
+            import tempfile
+            temp_dir = tempfile.mkdtemp()
+            options.add_argument(f'--user-data-dir={temp_dir}')
+            logger.info(f"浏览器: 使用临时用户数据目录: {temp_dir}")
         
         # 设置下载路径
         os.makedirs(self.error_logs_dir, exist_ok=True)
@@ -144,16 +167,25 @@ class BrowserManager:
             logger.error(f"浏览器初始化失败: {str(e)}")
             raise
     
-    def check_browser(self):
+    def check_browser(self, clear_cache=False):
         """检查浏览器是否正常"""
         try:
             # 尝试执行一个简单的操作来检查浏览器状态
             self.driver.current_url
             return True
         except WebDriverException:
-            logger.warning("浏览器连接断开，尝试重新初始化...")
-            self.init_browser()
+            if clear_cache:
+                logger.warning("浏览器连接断开，清理缓存并重新初始化...")
+            else:
+                logger.warning("浏览器连接断开，尝试重新初始化...")
+            self.init_browser(clear_cache=clear_cache)
             return False
+    
+    def restart_with_cache_clear(self):
+        """重启浏览器并清理缓存"""
+        logger.info("浏览器: 执行重启并清理缓存")
+        self.init_browser(clear_cache=True)
+        return True
     
     def quit(self):
         """关闭浏览器"""

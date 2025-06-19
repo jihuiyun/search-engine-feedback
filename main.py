@@ -58,9 +58,9 @@ def main():
         logger.info("初始化搜索引擎...")
         engines = {
             # 'sogou': SogouEngine(config_path, browser_manager),
-            'toutiao': ToutiaoEngine(config_path, browser_manager),
+            # 'toutiao': ToutiaoEngine(config_path, browser_manager),
             # 'baidu': BaiduEngine(config_path, browser_manager),
-            # 'so360': So360Engine(config_path, browser_manager),
+            'so360': So360Engine(config_path, browser_manager),
             # 'bing': BingEngine(config_path, browser_manager),
         }
         
