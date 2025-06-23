@@ -209,91 +209,200 @@ class SogouEngine(SearchEngine):
 
             # 上传有效资料
             try:
-                for image_path in self.engine_config['qualification_images']:
-                    full_path = os.path.join(self.config['qualification_dir'], image_path)
-                    if os.path.exists(full_path):
-                        # 点击添加附件按钮
+                logger.info("开始上传资质文件")
+                
+                for index, image_path in enumerate(self.engine_config['qualification_images']):
+                    # 获取绝对路径
+                    full_path = os.path.abspath(os.path.join(self.config['qualification_dir'], image_path))
+                    if not os.path.exists(full_path):
+                        logger.error(f"文件不存在: {full_path}")
+                        continue
+                    
+                    logger.info(f"准备上传第 {index + 1} 个文件: {image_path}")
+                    
+                    # 点击添加附件按钮，生成新的文件选择区域
+                    try:
                         add_file_button = self.wait.until(
                             EC.element_to_be_clickable((By.ID, "imgAddForm1"))
                         )
-                        self.driver.execute_script("arguments[0].click();", add_file_button)
-                        time.sleep(2)  # 增加等待时间
                         
-                        # 找到文件输入框并上传文件
+                        # 使用JavaScript点击按钮，触发goAdd函数
+                        self.driver.execute_script("goAdd('imgForm1','Form1');")
+                        time.sleep(3)  # 等待新的文件选择区域生成
+                        
+                        logger.info(f"成功点击添加附件按钮，生成第 {index + 1} 个文件选择区域")
+                        
+                    except Exception as e:
+                        logger.error(f"点击添加附件按钮失败: {str(e)}")
+                        # 如果找不到主按钮，尝试直接点击链接
                         try:
-                            # 使用多个选择器属性来精确定位
-                            file_input = self.wait.until(
-                                EC.presence_of_element_located((
-                                    By.CSS_SELECTOR, 
-                                    "input[type='file'][name='imgForm1[]'][id='img']"
-                                ))
+                            add_link = self.wait.until(
+                                EC.element_to_be_clickable((By.XPATH, "//a[contains(text(), '添加附件')]"))
                             )
+                            self.driver.execute_script("arguments[0].click();", add_link)
+                            time.sleep(3)
+                            logger.info("通过链接成功点击添加附件")
+                        except Exception as e2:
+                            logger.error(f"通过链接点击添加附件也失败: {str(e2)}")
+                            continue
+                    
+                    # 查找新生成的文件输入框并上传文件
+                    try:
+                        # 查找表单区域内所有的文件输入框
+                        form_area = self.driver.find_element(By.ID, "imgForm1")
+                        file_inputs = form_area.find_elements(By.CSS_SELECTOR, "input[type='file']")
+                        
+                        if len(file_inputs) > index:
+                            # 使用对应索引的文件输入框
+                            file_input = file_inputs[index]
+                            logger.info(f"找到第 {index + 1} 个文件输入框")
+                        else:
+                            # 如果索引超出范围，使用最后一个文件输入框
+                            file_input = file_inputs[-1] if file_inputs else None
+                            logger.info(f"使用最后一个文件输入框 (共 {len(file_inputs)} 个)")
+                        
+                        if not file_input:
+                            logger.error("无法找到合适的文件输入框")
+                            continue
+                        
+                        # 确保文件输入框可见和可用
+                        self.driver.execute_script("""
+                            arguments[0].style.display = 'block';
+                            arguments[0].style.visibility = 'visible';
+                            arguments[0].style.opacity = '1';
+                            arguments[0].style.position = 'static';
+                            arguments[0].style.width = 'auto';
+                            arguments[0].style.height = 'auto';
+                            arguments[0].removeAttribute('hidden');
+                        """, file_input)
+                        
+                        time.sleep(1)
+                        
+                        # 上传文件
+                        file_input.send_keys(full_path)
+                        logger.info(f"成功上传文件到第 {index + 1} 个位置: {image_path}")
+                        
+                        # 等待文件上传完成
+                        time.sleep(1)
+                        
+                        # 检查该文件是否上传成功
+                        try:
+                            # 等待一小段时间让上传处理完成
+                            time.sleep(1)
                             
-                            # 确保元素可见和可交互
-                            self.driver.execute_script("""
-                                arguments[0].style.display = 'block';
-                                arguments[0].style.visibility = 'visible';
-                                arguments[0].style.opacity = '1';
-                                arguments[0].style.height = '100px';
-                                arguments[0].style.width = '260px';
-                                arguments[0].style.position = 'static';
-                            """, file_input)
-                            
-                            # 等待元素变为可交互状态
-                            time.sleep(2)
-                            
-                            try:
-                                # 创建一个临时的文件选择对话框并触发点击
-                                self.driver.execute_script("""
-                                    var input = arguments[0];
-                                    input.addEventListener('change', function() {
-                                        input.dispatchEvent(new Event('change', { bubbles: true }));
-                                        input.dispatchEvent(new Event('blur', { bubbles: true }));
-                                    });
-                                    input.click();
-                                """, file_input)
-                                
-                                # 等待用户手动选择文件
-                                logger.info(f"请手动选择文件: {image_path}")
-                                time.sleep(10)  # 给用户10秒时间选择文件
-                                
-                            except Exception as e:
-                                logger.error(f"触发文件选择失败: {str(e)}")
-                                continue
-                            
-                            logger.info(f"成功上传文件: {image_path}")
-                            time.sleep(3)  # 等待上传完成
+                            # 重新查找文件输入框来检查文件名
+                            updated_file_inputs = form_area.find_elements(By.CSS_SELECTOR, "input[type='file']")
+                            if len(updated_file_inputs) > index:
+                                current_file_input = updated_file_inputs[index]
+                                file_value = current_file_input.get_attribute('value')
+                                if file_value and image_path in file_value:
+                                    logger.info(f"文件 {image_path} 上传成功，显示值: {file_value}")
+                                else:
+                                    logger.warning(f"文件 {image_path} 上传状态不确定")
                             
                         except Exception as e:
-                            logger.error(f"上传单个文件失败: {str(e)}")
-                            continue
+                            logger.warning(f"检查文件 {image_path} 上传状态时出错: {str(e)}")
+                        
+                        # 为下一个文件做准备
+                        time.sleep(1)
+                        
+                    except Exception as e:
+                        logger.error(f"上传文件 {image_path} 失败: {str(e)}")
+                        continue
                 
-                logger.info("所有资质文件上传完成")
+                logger.info("所有资质文件上传处理完成")
                 
             except Exception as e:
-                logger.error(f"上传文件失败: {str(e)}")
-                return False
+                logger.error(f"上传文件过程失败: {str(e)}")
+                # 不返回 False，继续执行后续步骤
+                logger.info("尽管文件上传可能失败，但继续执行后续步骤")
 
-            # 填写邮箱
-            email_input = self.wait.until(
-                EC.presence_of_element_located((By.NAME, "email"))
-            )
-            email_input.clear()
-            email_input.send_keys(self.feedback_config['email'])
+            # 填写联系方式（邮箱）
+            try:
+                # 确保联系方式类型选择为"邮箱"（默认应该已经是邮箱）
+                contact_type_span = self.wait.until(
+                    EC.element_to_be_clickable((By.ID, "webContactWayDefaultForm1"))
+                )
+                
+                # 检查当前选择的联系方式类型
+                current_contact_type = contact_type_span.text.strip()
+                logger.info(f"当前联系方式类型: {current_contact_type}")
+                
+                # 如果不是邮箱，点击选择邮箱
+                if current_contact_type != "邮箱":
+                    # 点击下拉框
+                    self.driver.execute_script("showSelect('Form1');")
+                    time.sleep(1)
+                    
+                    # 选择邮箱选项
+                    email_option = self.wait.until(
+                        EC.element_to_be_clickable((By.CSS_SELECTOR, "#webContactWaySelectForm1 a.webContactWaySelectValue"))
+                    )
+                    self.driver.execute_script("hideSelect(arguments[0],'Form1');", email_option)
+                    time.sleep(1)
+                    logger.info("成功选择邮箱联系方式")
+                
+                # 填写邮箱地址
+                email_input = self.wait.until(
+                    EC.presence_of_element_located((By.ID, "contactForm1"))
+                )
+                
+                # 使用JavaScript清除并设置邮箱值
+                self.driver.execute_script("""
+                    arguments[0].value = '';
+                    arguments[0].focus();
+                """, email_input)
+                time.sleep(0.5)
+                
+                email_input.send_keys(self.feedback_config['email'])
+                
+                # 触发blur事件以验证邮箱格式
+                self.driver.execute_script("""
+                    arguments[0].blur();
+                    arguments[0].dispatchEvent(new Event('blur', { bubbles: true }));
+                """, email_input)
+                
+                time.sleep(1)
+                
+                # 检查是否显示正确图标
+                try:
+                    ok_icon = self.driver.find_element(By.ID, "webContactWayOkForm1")
+                    if ok_icon.is_displayed():
+                        logger.info("邮箱格式验证成功")
+                    else:
+                        logger.warning("邮箱格式验证图标未显示")
+                except:
+                    logger.warning("未找到邮箱验证成功图标")
+                
+                # 检查是否显示错误提示
+                try:
+                    error_tip = self.driver.find_element(By.ID, "webContactWayErrorForm1")
+                    if error_tip.is_displayed():
+                        logger.error(f"邮箱填写出现错误提示: {error_tip.text}")
+                    else:
+                        logger.info("邮箱填写无错误提示")
+                except:
+                    logger.info("未找到错误提示元素")
+                
+                logger.info(f"成功填写联系方式邮箱: {self.feedback_config['email']}")
+                
+            except Exception as e:
+                logger.error(f"填写联系方式失败: {str(e)}")
+                return False
             
             # 等待用户完成验证码验证
-            try:
-                # 创建一个新的 WebDriverWait 实例，设置超时时间为 30 分钟
-                long_wait = WebDriverWait(self.driver, 1800)  # 30分钟 = 1800秒
-                long_wait.until(
-                    lambda driver: driver.find_element(
-                        By.CSS_SELECTOR, 
-                        "div.success-message"
-                    ).is_displayed()
-                )
-            except TimeoutException:
-                logger.error("等待验证码验证超时(30分钟)")
-                return False
+            # try:
+            #     # 创建一个新的 WebDriverWait 实例，设置超时时间为 10s
+            #     long_wait = WebDriverWait(self.driver, 10)
+            #     long_wait.until(
+            #         lambda driver: driver.find_element(
+            #             By.CSS_SELECTOR, 
+            #             "div.success-message"
+            #         ).is_displayed()
+            #     )
+            # except TimeoutException:
+            #     logger.error("等待验证码验证超时(10s)")
+            #     return False
             
             # 提交表单
             submit_button = self.wait.until(
