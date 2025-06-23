@@ -406,7 +406,7 @@ class SogouEngine(SearchEngine):
             
             # 提交表单
             submit_button = self.wait.until(
-                EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), '提交')]"))
+                EC.element_to_be_clickable((By.XPATH, "//a[contains(text(), '提交')]"))
             )
             submit_button.click()
             
